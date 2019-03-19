@@ -66,7 +66,6 @@ defmodule BroadwayRabbitmq.AmqpClient do
 
   defp validate_conn_opts(opts) do
     {:ok, opts[:connection] || []}
-
     # TODO: validate options
     #   :username,
     #   :password,

@@ -1,7 +1,10 @@
 defmodule BroadwayRabbitmq.Producer do
   use GenStage
 
+  require Logger
+
   alias Broadway.{Message, Acknowledger}
+  alias BroadwayRabbitmq.Backoff
 
   @behaviour Acknowledger
 
@@ -14,11 +17,18 @@ defmodule BroadwayRabbitmq.Producer do
         raise ArgumentError, "invalid options given to #{inspect(client)}.init/1, " <> message
 
       {:ok, queue_name, config} ->
-        # TODO: Treat channel setup errors properly
-        {:ok, channel} = client.setup_channel(queue_name, config)
-        consumer_tag = client.consume(channel, queue_name)
+        state =
+          connect(%{
+            client: client,
+            channel: nil,
+            consumer_tag: nil,
+            queue_name: queue_name,
+            config: config,
+            backoff: Backoff.new(opts),
+            conn_ref: nil
+          })
 
-        {:producer, %{client: client, channel: channel, consumer_tag: consumer_tag}}
+        {:producer, state}
     end
   end
 
@@ -54,6 +64,14 @@ defmodule BroadwayRabbitmq.Producer do
     {:noreply, [message], state}
   end
 
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, %{conn_ref: ref} = state) do
+    {:noreply, [], connect(state)}
+  end
+
+  def handle_info(:connect, state) do
+    {:noreply, [], connect(state)}
+  end
+
   def handle_info(_, state) do
     {:noreply, [], state}
   end
@@ -63,18 +81,53 @@ defmodule BroadwayRabbitmq.Producer do
     successful
     |> Enum.each(fn msg ->
       {client, delivery_tag} = extract_client_and_delivery_tag(msg)
-      client.ack(channel, delivery_tag)
+      call_ack(client, channel, delivery_tag)
     end)
 
     failed
     |> Enum.each(fn msg ->
       {client, delivery_tag} = extract_client_and_delivery_tag(msg)
-      client.reject(channel, delivery_tag)
+      call_reject(client, channel, delivery_tag)
     end)
+  end
+
+  defp call_ack(client, channel, delivery_tag) do
+    try do
+      client.ack(channel, delivery_tag)
+    catch
+      kind, reason ->
+        Logger.error(Exception.format(kind, reason, System.stacktrace()))
+    end
+  end
+
+  defp call_reject(client, channel, delivery_tag) do
+    try do
+      client.reject(channel, delivery_tag)
+    catch
+      kind, reason ->
+        Logger.error(Exception.format(kind, reason, System.stacktrace()))
+    end
   end
 
   defp extract_client_and_delivery_tag(message) do
     {_, _, %{client: client, delivery_tag: delivery_tag}} = message.acknowledger
     {client, delivery_tag}
+  end
+
+  defp connect(state) do
+    %{client: client, queue_name: queue_name, config: config, backoff: backoff} = state
+    # TODO: Treat other setup errors properly
+    case client.setup_channel(queue_name, config) do
+      {:ok, channel} ->
+        ref = Process.monitor(channel.conn.pid)
+        backoff = backoff && Backoff.reset(backoff)
+        consumer_tag = client.consume(channel, queue_name)
+        %{state | channel: channel, consumer_tag: consumer_tag, backoff: backoff, conn_ref: ref}
+
+      {:error, :econnrefused} ->
+        {timeout, backoff} = Backoff.backoff(backoff)
+        Process.send_after(self(), :connect, timeout)
+        %{state | channel: nil, consumer_tag: nil, backoff: backoff, conn_ref: nil}
+    end
   end
 end
