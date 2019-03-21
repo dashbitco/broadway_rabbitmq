@@ -39,9 +39,24 @@ defmodule BroadwayRabbitmq.ProducerTest do
     @impl true
     def setup_channel(_queue_name, config) do
       test_pid = config[:test_pid]
-      channel = FakeChannel.new(test_pid)
-      send(test_pid, {:setup_channel, channel})
-      {:ok, channel}
+
+      status =
+        Agent.get_and_update(config[:connection_agent], fn
+          [status | rest] ->
+            {status, rest}
+
+          _ ->
+            {:ok, []}
+        end)
+
+      if status == :ok do
+        channel = FakeChannel.new(test_pid)
+        send(test_pid, {:setup_channel, :ok, channel})
+        {:ok, channel}
+      else
+        send(test_pid, {:setup_channel, :error, nil})
+        {:error, :econnrefused}
+      end
     end
 
     @impl true
@@ -92,6 +107,26 @@ defmodule BroadwayRabbitmq.ProducerTest do
     end
   end
 
+  test "raise an ArgumentError with proper message when client options are invalid" do
+    assert_raise(
+      ArgumentError,
+      "invalid options given to BroadwayRabbitmq.AmqpClient.init/1, expected :queue_name to be a non empty string, got: nil",
+      fn ->
+        BroadwayRabbitmq.Producer.init(queue_name: nil)
+      end
+    )
+  end
+
+  test "raise an ArgumentError with proper message when backoff options are invalid" do
+    assert_raise(
+      ArgumentError,
+      "unknown type :unknown_type",
+      fn ->
+        BroadwayRabbitmq.Producer.init(queue_name: "test", backoff_type: :unknown_type)
+      end
+    )
+  end
+
   test "forward messages delivered by the channel" do
     {:ok, broadway} = start_broadway()
 
@@ -117,17 +152,31 @@ defmodule BroadwayRabbitmq.ProducerTest do
     stop_broadway(broadway)
   end
 
-  describe "connection is lost" do
+  describe "handle connection loss" do
+    test "producer is not restarted" do
+      {:ok, broadway} = start_broadway()
+      assert_receive {:setup_channel, :ok, _}
+      producer_1 = get_producer(broadway)
+
+      deliver_messages(broadway, [1, :break_conn])
+      assert_receive {:setup_channel, :ok, _}
+      producer_2 = get_producer(broadway)
+
+      assert producer_1 == producer_2
+
+      stop_broadway(broadway)
+    end
+
     test "open a new connection/channel and keep consuming messages" do
       {:ok, broadway} = start_broadway()
-      assert_receive {:setup_channel, channel_1}
+      assert_receive {:setup_channel, :ok, channel_1}
 
       deliver_messages(broadway, [1, 2])
       assert_receive {:message_handled, 1, ^channel_1}
       assert_receive {:message_handled, 2, ^channel_1}
 
       deliver_messages(broadway, [:break_conn])
-      assert_receive {:setup_channel, channel_2}
+      assert_receive {:setup_channel, :ok, channel_2}
 
       deliver_messages(broadway, [3, 4])
       assert_receive {:message_handled, 3, ^channel_2}
@@ -141,7 +190,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
 
     test "processed messages delivered by the old connection/channel will not be acknowledged" do
       {:ok, broadway} = start_broadway()
-      assert_receive {:setup_channel, channel}
+      assert_receive {:setup_channel, :ok, channel}
 
       deliver_messages(broadway, [1, :break_conn])
 
@@ -154,7 +203,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
 
     test "log error when trying to acknowledge" do
       {:ok, broadway} = start_broadway()
-      assert_receive {:setup_channel, channel}
+      assert_receive {:setup_channel, :ok, channel}
 
       assert capture_log(fn ->
                deliver_messages(broadway, [:break_conn])
@@ -165,7 +214,63 @@ defmodule BroadwayRabbitmq.ProducerTest do
     end
   end
 
-  defp start_broadway() do
+  describe "handle connection refused" do
+    test "log the error and try to reconnect" do
+      assert capture_log(fn ->
+               {:ok, broadway} = start_broadway(connect_responses: [:error])
+               assert_receive {:setup_channel, :error, _}
+               assert_receive {:setup_channel, :ok, _}
+               stop_broadway(broadway)
+             end) =~ "Cannot connect to broker"
+    end
+
+    test "if backoff_type = :stop, log the error and don't try to reconnect" do
+      assert capture_log(fn ->
+               {:ok, broadway} = start_broadway(connect_responses: [:error], backoff_type: :stop)
+               assert_receive {:setup_channel, :error, _}
+               refute_receive {:setup_channel, _, _}
+               stop_broadway(broadway)
+             end) =~ "Cannot connect to broker"
+    end
+
+    test "keep retrying to connect using the backoff strategy" do
+      {:ok, broadway} = start_broadway(connect_responses: [:ok, :error, :error, :error, :ok])
+      assert_receive {:setup_channel, :ok, _}
+
+      deliver_messages(broadway, [1, :break_conn])
+
+      assert_receive {:setup_channel, :error, _}
+      assert get_backoff_timeout(broadway) == 10
+      assert_receive {:setup_channel, :error, _}
+      assert get_backoff_timeout(broadway) == 20
+      assert_receive {:setup_channel, :error, _}
+      assert get_backoff_timeout(broadway) == 40
+
+      assert_receive {:setup_channel, :ok, _}
+      refute_receive {:setup_channel, _, _}
+
+      stop_broadway(broadway)
+    end
+
+    test "reset backoff timeout after a sucessful connection" do
+      {:ok, broadway} = start_broadway(connect_responses: [:error, :ok])
+
+      assert_receive {:setup_channel, :error, _}
+      assert get_backoff_timeout(broadway) == 10
+
+      assert_receive {:setup_channel, :ok, _}
+      assert get_backoff_timeout(broadway) == nil
+
+      stop_broadway(broadway)
+    end
+  end
+
+  defp start_broadway(opts \\ []) do
+    connect_responses = Keyword.get(opts, :connect_responses, [])
+    backoff_type = Keyword.get(opts, :backoff_type, :exp)
+
+    {:ok, connection_agent} = Agent.start_link(fn -> connect_responses end)
+
     Broadway.start_link(Forwarder,
       name: new_unique_name(),
       context: %{test_pid: self()},
@@ -176,6 +281,10 @@ defmodule BroadwayRabbitmq.ProducerTest do
              client: FakeRabbitmqClient,
              queue: "test",
              test_pid: self(),
+             backoff_type: backoff_type,
+             backoff_min: 10,
+             backoff_max: 100,
+             connection_agent: connection_agent,
              qos: [prefetch_count: 10]},
           stages: 1
         ]
@@ -203,6 +312,16 @@ defmodule BroadwayRabbitmq.ProducerTest do
     Enum.each(messages, fn msg ->
       send(producer, {:basic_deliver, msg, %{delivery_tag: msg}})
     end)
+  end
+
+  defp get_producer(broadway, key \\ :default, index \\ 1) do
+    name = Process.info(broadway)[:registered_name]
+    :"#{name}.Producer_#{key}_#{index}"
+  end
+
+  defp get_backoff_timeout(broadway) do
+    producer = get_producer(broadway)
+    :sys.get_state(producer).state.module_state.backoff.state
   end
 
   defp stop_broadway(pid) do
