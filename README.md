@@ -1,4 +1,4 @@
-# BroadwayRabbitmq
+# Broadway RabbitMQ
 
 **TODO: Add description**
 
