@@ -17,18 +17,18 @@ defmodule BroadwayRabbitmq.Producer do
         raise ArgumentError, "invalid options given to #{inspect(client)}.init/1, " <> message
 
       {:ok, queue_name, config} ->
-        state =
-          connect(%{
-            client: client,
-            channel: nil,
-            consumer_tag: nil,
-            queue_name: queue_name,
-            config: config,
-            backoff: Backoff.new(opts),
-            conn_ref: nil
-          })
+        send(self(), :connect)
 
-        {:producer, state}
+        {:producer,
+         %{
+           client: client,
+           channel: nil,
+           consumer_tag: nil,
+           queue_name: queue_name,
+           config: config,
+           backoff: Backoff.new(opts),
+           conn_ref: nil
+         }}
     end
   end
 
@@ -78,35 +78,21 @@ defmodule BroadwayRabbitmq.Producer do
 
   @impl true
   def ack(channel, successful, failed) do
-    successful
-    |> Enum.each(fn msg ->
-      {client, delivery_tag} = extract_client_and_delivery_tag(msg)
-      call_ack(client, channel, delivery_tag)
-    end)
-
-    failed
-    |> Enum.each(fn msg ->
-      {client, delivery_tag} = extract_client_and_delivery_tag(msg)
-      call_reject(client, channel, delivery_tag)
-    end)
+    ack_messages(successful, channel, :ack)
+    ack_messages(failed, channel, :reject)
   end
 
-  defp call_ack(client, channel, delivery_tag) do
-    try do
-      client.ack(channel, delivery_tag)
-    catch
-      kind, reason ->
-        Logger.error(Exception.format(kind, reason, System.stacktrace()))
-    end
-  end
+  defp ack_messages(messages, channel, ack_func) do
+    Enum.each(messages, fn msg ->
+      {client, delivery_tag} = extract_client_and_delivery_tag(msg)
 
-  defp call_reject(client, channel, delivery_tag) do
-    try do
-      client.reject(channel, delivery_tag)
-    catch
-      kind, reason ->
-        Logger.error(Exception.format(kind, reason, System.stacktrace()))
-    end
+      try do
+        apply(client, ack_func, [channel, delivery_tag])
+      catch
+        kind, reason ->
+          Logger.error(Exception.format(kind, reason, System.stacktrace()))
+      end
+    end)
   end
 
   defp extract_client_and_delivery_tag(message) do
@@ -125,9 +111,20 @@ defmodule BroadwayRabbitmq.Producer do
         %{state | channel: channel, consumer_tag: consumer_tag, backoff: backoff, conn_ref: ref}
 
       {:error, :econnrefused} ->
+        handle_backoff(state)
+    end
+  end
+
+  defp handle_backoff(%{backoff: backoff} = state) do
+    Logger.error("Cannot connect to broker")
+
+    new_backoff =
+      if backoff do
         {timeout, backoff} = Backoff.backoff(backoff)
         Process.send_after(self(), :connect, timeout)
-        %{state | channel: nil, consumer_tag: nil, backoff: backoff, conn_ref: nil}
-    end
+        backoff
+      end
+
+    %{state | channel: nil, consumer_tag: nil, backoff: new_backoff, conn_ref: nil}
   end
 end
