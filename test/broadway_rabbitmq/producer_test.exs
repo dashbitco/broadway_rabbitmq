@@ -13,7 +13,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
 
       %{
         pid: fake_channel_pid,
-        conn: %{pid: fake_connection_pid},
+        conn: %{pid: fake_connection_pid, test_pid: test_pid},
         test_pid: test_pid
       }
     end
@@ -75,6 +75,23 @@ defmodule BroadwayRabbitmq.ProducerTest do
     def consume(_channel, _queue_name) do
       :fake_consumer_tag
     end
+
+    @impl true
+    def cancel(_channel, :fake_consumer_tag_closing) do
+      {:error, :closing}
+    end
+
+    @impl true
+    def cancel(%{test_pid: test_pid}, consumer_tag) do
+      send(test_pid, {:cancel, consumer_tag})
+      {:ok, consumer_tag}
+    end
+
+    @impl true
+    def close_connection(%{test_pid: test_pid}) do
+      send(test_pid, :connection_closed)
+      :ok
+    end
   end
 
   defmodule Forwarder do
@@ -127,6 +144,18 @@ defmodule BroadwayRabbitmq.ProducerTest do
     )
   end
 
+  test "defaut :prefetch_count is 50" do
+    {:producer, state, _} = BroadwayRabbitmq.Producer.init(queue_name: "test")
+    assert state[:config][:qos][:prefetch_count] == 50
+  end
+
+  test "producer :buffer_size should be :prefetch_count * 2" do
+    qos = [prefetch_count: 12]
+    {:producer, _, options} = BroadwayRabbitmq.Producer.init(queue_name: "test", qos: qos)
+
+    assert options[:buffer_size] == 24
+  end
+
   test "forward messages delivered by the channel" do
     {:ok, broadway} = start_broadway()
 
@@ -150,6 +179,27 @@ defmodule BroadwayRabbitmq.ProducerTest do
     assert_receive {:ack, 5}
 
     stop_broadway(broadway)
+  end
+
+  describe "prepare_for_draining" do
+    test "cancel consumer" do
+      channel = FakeChannel.new(self())
+      tag = :fake_consumer_tag
+      state = %{client: FakeRabbitmqClient, channel: channel, consumer_tag: tag}
+
+      assert BroadwayRabbitmq.Producer.prepare_for_draining(state) == :ok
+      assert_received {:cancel, ^tag}
+    end
+
+    test "log unsuccessful cancellation" do
+      channel = FakeChannel.new(self())
+      tag = :fake_consumer_tag_closing
+      state = %{client: FakeRabbitmqClient, channel: channel, consumer_tag: tag}
+
+      assert capture_log(fn ->
+               assert BroadwayRabbitmq.Producer.prepare_for_draining(state) == :ok
+             end) =~ "[error] Could not cancel producer while draining. Channel is closing"
+    end
   end
 
   describe "handle connection loss" do
@@ -221,7 +271,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
                assert_receive {:setup_channel, :error, _}
                assert_receive {:setup_channel, :ok, _}
                stop_broadway(broadway)
-             end) =~ "Cannot connect to broker"
+             end) =~ "Cannot connect to RabbitMQ broker"
     end
 
     test "if backoff_type = :stop, log the error and don't try to reconnect" do
@@ -230,7 +280,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
                assert_receive {:setup_channel, :error, _}
                refute_receive {:setup_channel, _, _}
                stop_broadway(broadway)
-             end) =~ "Cannot connect to broker"
+             end) =~ "Cannot connect to RabbitMQ broker"
     end
 
     test "keep retrying to connect using the backoff strategy" do
@@ -263,6 +313,13 @@ defmodule BroadwayRabbitmq.ProducerTest do
 
       stop_broadway(broadway)
     end
+  end
+
+  test "close connection on terminate" do
+    {:ok, broadway} = start_broadway()
+    assert_receive {:setup_channel, :ok, channel}
+    Process.exit(broadway, :shutdown)
+    assert_receive :connection_closed
   end
 
   defp start_broadway(opts \\ []) do
