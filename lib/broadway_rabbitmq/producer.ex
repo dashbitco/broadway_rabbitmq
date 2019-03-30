@@ -22,7 +22,7 @@ defmodule BroadwayRabbitmq.Producer do
         send(self(), :connect)
 
         prefetch_count = config[:qos][:prefetch_count]
-        options = [buffer_size: prefetch_count * 2]
+        options = [buffer_size: prefetch_count * 5]
 
         {:producer,
          %{

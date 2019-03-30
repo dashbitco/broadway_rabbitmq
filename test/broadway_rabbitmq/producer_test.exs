@@ -149,11 +149,11 @@ defmodule BroadwayRabbitmq.ProducerTest do
     assert state[:config][:qos][:prefetch_count] == 50
   end
 
-  test "producer :buffer_size should be :prefetch_count * 2" do
+  test "producer :buffer_size is :prefetch_count * 5" do
     qos = [prefetch_count: 12]
     {:producer, _, options} = BroadwayRabbitmq.Producer.init(queue_name: "test", qos: qos)
 
-    assert options[:buffer_size] == 24
+    assert options[:buffer_size] == 60
   end
 
   test "forward messages delivered by the channel" do
