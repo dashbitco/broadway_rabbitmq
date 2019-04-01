@@ -8,7 +8,11 @@ defmodule BroadwayRabbitmq.AmqpClient do
     Basic
   }
 
+  require Logger
+
   @behaviour BroadwayRabbitmq.RabbitmqClient
+
+  @default_prefetch_count 50
 
   @impl true
   def init(opts) do
@@ -51,6 +55,20 @@ defmodule BroadwayRabbitmq.AmqpClient do
     consumer_tag
   end
 
+  @impl true
+  def cancel(channel, consumer_tag) do
+    Basic.cancel(channel, consumer_tag)
+  end
+
+  @impl true
+  def close_connection(conn) do
+    if Process.alive?(conn.pid) do
+      Connection.close(conn)
+    else
+      :ok
+    end
+  end
+
   defp validate(opts, key, default \\ nil) when is_list(opts) do
     validate_option(key, opts[key] || default)
   end
@@ -91,10 +109,11 @@ defmodule BroadwayRabbitmq.AmqpClient do
   end
 
   defp validate_qos_opts(opts) do
-    {:ok, opts[:qos] || []}
+    qos = Keyword.put_new(opts[:qos] || [], :prefetch_count, @default_prefetch_count)
+    {:ok, qos}
     # TODO: validate options
     #   :prefetch_size,
     #   :prefetch_count,
-    #   :global (don't make any difference in the current implementation)
+    #   :global (don't use it. It doesn't make any difference with the current implementation)
   end
 end
