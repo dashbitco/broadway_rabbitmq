@@ -1,4 +1,97 @@
 defmodule BroadwayRabbitmq.Producer do
+  @moduledoc """
+  A RabbitMQ producer for Broadway.
+
+  ## Features
+
+    * Automatically acknowledges/rejects messages.
+    * Handles connection outages using backoff for retries.
+
+  ## Options
+
+    * `:queue` - Required. The name of the queue.
+    * `:connection` - Optional. Defines a set of options used by the RabbitMQ
+      client to open the connection with the RabbitMQ broker. See
+      `AMQP.Connection.open/1` (documentation)[https://hexdocs.pm/amqp/AMQP.Connection.html#open/1]
+      for the full list of options.
+    * `:declare` - Optional. Defines a  set of options used by the RabbitMQ client to
+      declare the queue. See `AMQP.Queue.declare/3`
+      (documentation)[https://hexdocs.pm/amqp/AMQP.Queue.html#declare/3]
+      for the full list of options.
+    * `:qos` - Optional. Defines a set of prefetch options used by the RabbitMQ client.
+      See `AMQP.Basic.qos/2`
+      (documentation)[https://hexdocs.pm/amqp/AMQP.Basic.html#qos/2] for the full
+      list of options. Pay attention that the `:global` option is not supported
+      by Broadway since each producer holds only one channel per connection.
+    * `:backoff_min` - The minimum backoff interval (default: `1_000`)
+    * `:backoff_max` - The maximum backoff interval (default: `30_000`)
+    * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
+    to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for
+    random exponential (default: `:rand_exp`)
+
+  ## Example
+
+      Broadway.start_link(MyBroadway,
+        name: MyBroadway,
+        producers: [
+          default: [
+            module:
+              {BroadwayRabbitmq.Producer,
+              queue: "my_queue",
+              connection: [
+                username: "user",
+                password: "password",
+                host: "192.168.0.10"
+              ],
+              declare: [
+                durable: true,
+                arguments: [
+                  {"x-dead-letter-exchange", :longstr, ""},
+                  {"x-dead-letter-routing-key", :longstr, "my_queue_error"}
+                ]
+              ]
+              qos: [
+                prefetch_count: 50
+              ]},
+            stages: 5
+          ]
+        ],
+        processors: [
+          default: []
+        ]
+      )
+
+  ## Back-pressure and `:prefetch_count`
+
+  Unlike the RabittMQ client that has a default `:prefetch_count` = 0,
+  which disables back-pressure, BroadwayRabbitMQ overwrite the default
+  value to `50` enabling the back-pressure mechanism. You can still define
+  it as `0`, however, if you do this, make sure the machine has enough
+  resources to handle the number of messages coming from the broker.
+
+  This is important because the BroadwayRabbitMQ producer does not work
+  as a poller like BroadwaySQS. Instead, it maintains an active connection
+  with a subscribed consumer that receives messages continuously as they
+  arrive in the queue. This is more efficient than using the `basic.get`
+  method, however, it removes the ability of the GenStage producer to control
+  the demand. Therefore we need to use the `:prefetch_count` option to
+  impose back-pressure at the channel level.
+
+  ## Connection loss and backoff
+
+  In case the connection cannot be opened or if a stablished connection is lost,
+  the producer will try to reconnect using an exponential random backoff strategy.
+  The strategy can be configured using the `:backoff_type` option.
+
+  ## Unsupported options
+
+  Currently, Broadway does not accept options for `Basic.consume/4` which
+  is called internally by the producer with default values. That means options
+  like `:no_ack` are not supported. If you have a scenario where you need to
+  customize those options, please open an issue, so we can consider adding this
+  feature.
+  """
+
   use GenStage
 
   require Logger
