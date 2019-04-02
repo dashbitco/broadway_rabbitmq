@@ -33,11 +33,11 @@ defmodule BroadwayRabbitmq.ProducerTest do
 
     @impl true
     def init(opts) do
-      {:ok, opts[:queue_name], opts}
+      {:ok, opts[:queue], opts}
     end
 
     @impl true
-    def setup_channel(_queue_name, config) do
+    def setup_channel(_queue, config) do
       test_pid = config[:test_pid]
 
       status =
@@ -72,7 +72,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
     end
 
     @impl true
-    def consume(_channel, _queue_name) do
+    def consume(_channel, _queue) do
       :fake_consumer_tag
     end
 
@@ -127,9 +127,9 @@ defmodule BroadwayRabbitmq.ProducerTest do
   test "raise an ArgumentError with proper message when client options are invalid" do
     assert_raise(
       ArgumentError,
-      "invalid options given to BroadwayRabbitmq.AmqpClient.init/1, expected :queue_name to be a non empty string, got: nil",
+      "invalid options given to BroadwayRabbitmq.AmqpClient.init/1, expected :queue to be a non empty string, got: nil",
       fn ->
-        BroadwayRabbitmq.Producer.init(queue_name: nil)
+        BroadwayRabbitmq.Producer.init(queue: nil)
       end
     )
   end
@@ -139,19 +139,14 @@ defmodule BroadwayRabbitmq.ProducerTest do
       ArgumentError,
       "unknown type :unknown_type",
       fn ->
-        BroadwayRabbitmq.Producer.init(queue_name: "test", backoff_type: :unknown_type)
+        BroadwayRabbitmq.Producer.init(queue: "test", backoff_type: :unknown_type)
       end
     )
   end
 
-  test "defaut :prefetch_count is 50" do
-    {:producer, state, _} = BroadwayRabbitmq.Producer.init(queue_name: "test")
-    assert state[:config][:qos][:prefetch_count] == 50
-  end
-
   test "producer :buffer_size is :prefetch_count * 5" do
     qos = [prefetch_count: 12]
-    {:producer, _, options} = BroadwayRabbitmq.Producer.init(queue_name: "test", qos: qos)
+    {:producer, _, options} = BroadwayRabbitmq.Producer.init(queue: "test", qos: qos)
 
     assert options[:buffer_size] == 60
   end

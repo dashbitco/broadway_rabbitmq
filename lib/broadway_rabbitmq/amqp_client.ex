@@ -13,14 +13,24 @@ defmodule BroadwayRabbitmq.AmqpClient do
   @behaviour BroadwayRabbitmq.RabbitmqClient
 
   @default_prefetch_count 50
+  @supported_options [
+    :queue,
+    :connection,
+    :declare,
+    :qos,
+    :backoff_min,
+    :backoff_max,
+    :backoff_type
+  ]
 
   @impl true
   def init(opts) do
-    with {:ok, queue_name} <- validate(opts, :queue_name),
+    with {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
+         {:ok, queue} <- validate(opts, :queue),
          {:ok, conn_opts} <- validate_conn_opts(opts),
          {:ok, declare_opts} <- validate_declare_opts(opts),
          {:ok, qos_opts} <- validate_qos_opts(opts) do
-      {:ok, queue_name,
+      {:ok, queue,
        %{
          connection: conn_opts,
          declare: declare_opts,
@@ -30,10 +40,10 @@ defmodule BroadwayRabbitmq.AmqpClient do
   end
 
   @impl true
-  def setup_channel(queue_name, config) do
+  def setup_channel(queue, config) do
     with {:ok, conn} <- Connection.open(config.connection),
          {:ok, channel} <- Channel.open(conn),
-         {:ok, _} <- Queue.declare(channel, queue_name, config.declare),
+         {:ok, _} <- Queue.declare(channel, queue, config.declare),
          :ok <- Basic.qos(channel, config.qos) do
       {:ok, channel}
     end
@@ -50,8 +60,8 @@ defmodule BroadwayRabbitmq.AmqpClient do
   end
 
   @impl true
-  def consume(channel, queue_name) do
-    {:ok, consumer_tag} = Basic.consume(channel, queue_name)
+  def consume(channel, queue) do
+    {:ok, consumer_tag} = Basic.consume(channel, queue)
     consumer_tag
   end
 
@@ -73,8 +83,8 @@ defmodule BroadwayRabbitmq.AmqpClient do
     validate_option(key, opts[key] || default)
   end
 
-  defp validate_option(:queue_name, value) when not is_binary(value) or value == "",
-    do: validation_error(:queue_name, "a non empty string", value)
+  defp validate_option(:queue, value) when not is_binary(value) or value == "",
+    do: validation_error(:queue, "a non empty string", value)
 
   defp validate_option(_, value), do: {:ok, value}
 
@@ -83,37 +93,51 @@ defmodule BroadwayRabbitmq.AmqpClient do
   end
 
   defp validate_conn_opts(opts) do
-    {:ok, opts[:connection] || []}
-    # TODO: validate options
-    #   :username,
-    #   :password,
-    #   :virtual_host,
-    #   :host,
-    #   :port,
-    #   :channel_max,
-    #   :frame_max,
-    #   :heartbeat,
-    #   :connection_timeout,
-    #   :ssl_options,
-    #   :client_properties,
-    #   :socket_options
+    group = :connection
+    conn_opts = opts[group] || []
+
+    supported = [
+      :username,
+      :password,
+      :virtual_host,
+      :host,
+      :port,
+      :channel_max,
+      :frame_max,
+      :heartbeat,
+      :connection_timeout,
+      :ssl_options,
+      :client_properties,
+      :socket_options
+    ]
+
+    validate_supported_opts(conn_opts, group, supported)
   end
 
   defp validate_declare_opts(opts) do
-    {:ok, opts[:declare] || []}
-    # TODO: validate options
-    #   :durable,
-    #   :auto_delete,
-    #   :exclusive,
-    #   :passive
+    group = :declare
+    declare_opts = opts[group] || []
+    supported = [:durable, :auto_delete, :exclusive, :passive]
+    validate_supported_opts(declare_opts, group, supported)
   end
 
   defp validate_qos_opts(opts) do
-    qos = Keyword.put_new(opts[:qos] || [], :prefetch_count, @default_prefetch_count)
-    {:ok, qos}
-    # TODO: validate options
-    #   :prefetch_size,
-    #   :prefetch_count,
-    #   :global (don't use it. It doesn't make any difference with the current implementation)
+    group = :qos
+    qos_opts = opts[group] || []
+    supported = [:prefetch_size, :prefetch_count]
+
+    qos_opts
+    |> Keyword.put_new(:prefetch_count, @default_prefetch_count)
+    |> validate_supported_opts(group, supported)
+  end
+
+  defp validate_supported_opts(opts, group_name, supported_opts) do
+    opts
+    |> Keyword.keys()
+    |> Enum.reject(fn k -> k in supported_opts end)
+    |> case do
+      [] -> {:ok, opts}
+      keys -> {:error, "Unsupported options #{inspect(keys)} for #{inspect(group_name)}"}
+    end
   end
 end
