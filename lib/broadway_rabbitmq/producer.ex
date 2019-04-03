@@ -12,17 +12,14 @@ defmodule BroadwayRabbitmq.Producer do
     * `:queue` - Required. The name of the queue.
     * `:connection` - Optional. Defines a set of options used by the RabbitMQ
       client to open the connection with the RabbitMQ broker. See
-      `AMQP.Connection.open/1` (documentation)[https://hexdocs.pm/amqp/AMQP.Connection.html#open/1]
-      for the full list of options.
-    * `:declare` - Optional. Defines a  set of options used by the RabbitMQ client to
-      declare the queue. See `AMQP.Queue.declare/3`
-      (documentation)[https://hexdocs.pm/amqp/AMQP.Queue.html#declare/3]
-      for the full list of options.
+      `AMQP.Connection.open/1` for the full list of options.
+    * `:declare` - Optional. Defines a set of options used by the RabbitMQ
+      client to declare the queue. See `AMQP.Queue.declare/3` for the full list of
+      options.
     * `:qos` - Optional. Defines a set of prefetch options used by the RabbitMQ client.
-      See `AMQP.Basic.qos/2`
-      (documentation)[https://hexdocs.pm/amqp/AMQP.Basic.html#qos/2] for the full
-      list of options. Pay attention that the `:global` option is not supported
-      by Broadway since each producer holds only one channel per connection.
+      See `AMQP.Basic.qos/2` for the full list of options. Pay attention that the
+      `:global` option is not supported by Broadway since each producer holds only one
+      channel per connection.
     * `:backoff_min` - The minimum backoff interval (default: `1_000`)
     * `:backoff_max` - The maximum backoff interval (default: `30_000`)
     * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
