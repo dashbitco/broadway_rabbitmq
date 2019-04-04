@@ -37,7 +37,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
     end
 
     @impl true
-    def setup_channel(_queue, config) do
+    def setup_channel(config) do
       test_pid = config[:test_pid]
 
       status =
