@@ -5,7 +5,7 @@ defmodule BroadwayRabbitmq.AmqpClientTest do
 
   test "default options" do
     assert AmqpClient.init(queue: "queue") ==
-             {:ok, "queue", %{connection: [], declare: [], qos: [prefetch_count: 50]}}
+             {:ok, "queue", %{connection: [], qos: [prefetch_count: 50]}}
   end
 
   describe "validate init options" do
@@ -25,13 +25,6 @@ defmodule BroadwayRabbitmq.AmqpClientTest do
         socket_options: nil
       ]
 
-      declare = [
-        durable: nil,
-        auto_delete: nil,
-        exclusive: nil,
-        passive: nil
-      ]
-
       qos = [
         prefetch_size: nil,
         prefetch_count: nil
@@ -40,12 +33,10 @@ defmodule BroadwayRabbitmq.AmqpClientTest do
       options = [
         queue: "queue",
         connection: connection,
-        declare: declare,
         qos: qos
       ]
 
-      assert AmqpClient.init(options) ==
-               {:ok, "queue", %{connection: connection, declare: declare, qos: qos}}
+      assert AmqpClient.init(options) == {:ok, "queue", %{connection: connection, qos: qos}}
     end
 
     test "unsupported options for Broadway" do
@@ -56,11 +47,6 @@ defmodule BroadwayRabbitmq.AmqpClientTest do
     test "unsupported options for :connection" do
       assert AmqpClient.init(queue: "queue", connection: [option_1: 1, option_2: 2]) ==
                {:error, "Unsupported options [:option_1, :option_2] for :connection"}
-    end
-
-    test "unsupported options for :declare" do
-      assert AmqpClient.init(queue: "queue", declare: [option_1: 1, option_2: 2]) ==
-               {:error, "Unsupported options [:option_1, :option_2] for :declare"}
     end
 
     test "unsupported options for :qos" do

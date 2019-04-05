@@ -4,7 +4,6 @@ defmodule BroadwayRabbitmq.AmqpClient do
   alias AMQP.{
     Connection,
     Channel,
-    Queue,
     Basic
   }
 
@@ -16,7 +15,6 @@ defmodule BroadwayRabbitmq.AmqpClient do
   @supported_options [
     :queue,
     :connection,
-    :declare,
     :qos,
     :backoff_min,
     :backoff_max,
@@ -28,22 +26,19 @@ defmodule BroadwayRabbitmq.AmqpClient do
     with {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
          {:ok, queue} <- validate(opts, :queue),
          {:ok, conn_opts} <- validate_conn_opts(opts),
-         {:ok, declare_opts} <- validate_declare_opts(opts),
          {:ok, qos_opts} <- validate_qos_opts(opts) do
       {:ok, queue,
        %{
          connection: conn_opts,
-         declare: declare_opts,
          qos: qos_opts
        }}
     end
   end
 
   @impl true
-  def setup_channel(queue, config) do
+  def setup_channel(config) do
     with {:ok, conn} <- Connection.open(config.connection),
          {:ok, channel} <- Channel.open(conn),
-         {:ok, _} <- Queue.declare(channel, queue, config.declare),
          :ok <- Basic.qos(channel, config.qos) do
       {:ok, channel}
     end
@@ -112,13 +107,6 @@ defmodule BroadwayRabbitmq.AmqpClient do
     ]
 
     validate_supported_opts(conn_opts, group, supported)
-  end
-
-  defp validate_declare_opts(opts) do
-    group = :declare
-    declare_opts = opts[group] || []
-    supported = [:durable, :auto_delete, :exclusive, :passive]
-    validate_supported_opts(declare_opts, group, supported)
   end
 
   defp validate_qos_opts(opts) do

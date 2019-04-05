@@ -13,9 +13,6 @@ defmodule BroadwayRabbitmq.Producer do
     * `:connection` - Optional. Defines a set of options used by the RabbitMQ
       client to open the connection with the RabbitMQ broker. See
       `AMQP.Connection.open/1` for the full list of options.
-    * `:declare` - Optional. Defines a set of options used by the RabbitMQ
-      client to declare the queue. See `AMQP.Queue.declare/3` for the full list of
-      options.
     * `:qos` - Optional. Defines a set of prefetch options used by the RabbitMQ client.
       See `AMQP.Basic.qos/2` for the full list of options. Pay attention that the
       `:global` option is not supported by Broadway since each producer holds only one
@@ -40,13 +37,6 @@ defmodule BroadwayRabbitmq.Producer do
                 password: "password",
                 host: "192.168.0.10"
               ],
-              declare: [
-                durable: true,
-                arguments: [
-                  {"x-dead-letter-exchange", :longstr, ""},
-                  {"x-dead-letter-routing-key", :longstr, "my_queue_error"}
-                ]
-              ]
               qos: [
                 prefetch_count: 50
               ]},
@@ -228,7 +218,7 @@ defmodule BroadwayRabbitmq.Producer do
   defp connect(state) do
     %{client: client, queue_name: queue_name, config: config, backoff: backoff} = state
     # TODO: Treat other setup errors properly
-    case client.setup_channel(queue_name, config) do
+    case client.setup_channel(config) do
       {:ok, channel} ->
         ref = Process.monitor(channel.conn.pid)
         backoff = backoff && Backoff.reset(backoff)
