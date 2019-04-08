@@ -1,4 +1,4 @@
-defmodule BroadwayRabbitmq.ProducerTest do
+defmodule BroadwayRabbitMQ.ProducerTest do
   use ExUnit.Case
 
   import ExUnit.CaptureLog
@@ -29,7 +29,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
   end
 
   defmodule FakeRabbitmqClient do
-    @behaviour BroadwayRabbitmq.RabbitmqClient
+    @behaviour BroadwayRabbitMQ.RabbitmqClient
 
     @impl true
     def init(opts) do
@@ -127,9 +127,9 @@ defmodule BroadwayRabbitmq.ProducerTest do
   test "raise an ArgumentError with proper message when client options are invalid" do
     assert_raise(
       ArgumentError,
-      "invalid options given to BroadwayRabbitmq.AmqpClient.init/1, expected :queue to be a non empty string, got: nil",
+      "invalid options given to BroadwayRabbitMQ.AmqpClient.init/1, expected :queue to be a non empty string, got: nil",
       fn ->
-        BroadwayRabbitmq.Producer.init(queue: nil)
+        BroadwayRabbitMQ.Producer.init(queue: nil)
       end
     )
   end
@@ -139,14 +139,14 @@ defmodule BroadwayRabbitmq.ProducerTest do
       ArgumentError,
       "unknown type :unknown_type",
       fn ->
-        BroadwayRabbitmq.Producer.init(queue: "test", backoff_type: :unknown_type)
+        BroadwayRabbitMQ.Producer.init(queue: "test", backoff_type: :unknown_type)
       end
     )
   end
 
   test "producer :buffer_size is :prefetch_count * 5" do
     qos = [prefetch_count: 12]
-    {:producer, _, options} = BroadwayRabbitmq.Producer.init(queue: "test", qos: qos)
+    {:producer, _, options} = BroadwayRabbitMQ.Producer.init(queue: "test", qos: qos)
 
     assert options[:buffer_size] == 60
   end
@@ -182,7 +182,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
       tag = :fake_consumer_tag
       state = %{client: FakeRabbitmqClient, channel: channel, consumer_tag: tag}
 
-      assert BroadwayRabbitmq.Producer.prepare_for_draining(state) == :ok
+      assert BroadwayRabbitMQ.Producer.prepare_for_draining(state) == :ok
       assert_received {:cancel, ^tag}
     end
 
@@ -192,7 +192,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
       state = %{client: FakeRabbitmqClient, channel: channel, consumer_tag: tag}
 
       assert capture_log(fn ->
-               assert BroadwayRabbitmq.Producer.prepare_for_draining(state) == :ok
+               assert BroadwayRabbitMQ.Producer.prepare_for_draining(state) == :ok
              end) =~ "[error] Could not cancel producer while draining. Channel is closing"
     end
   end
@@ -329,7 +329,7 @@ defmodule BroadwayRabbitmq.ProducerTest do
       producers: [
         default: [
           module:
-            {BroadwayRabbitmq.Producer,
+            {BroadwayRabbitMQ.Producer,
              client: FakeRabbitmqClient,
              queue: "test",
              test_pid: self(),

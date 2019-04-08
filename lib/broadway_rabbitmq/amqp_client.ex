@@ -1,4 +1,4 @@
-defmodule BroadwayRabbitmq.AmqpClient do
+defmodule BroadwayRabbitMQ.AmqpClient do
   @moduledoc false
 
   alias AMQP.{
@@ -9,7 +9,7 @@ defmodule BroadwayRabbitmq.AmqpClient do
 
   require Logger
 
-  @behaviour BroadwayRabbitmq.RabbitmqClient
+  @behaviour BroadwayRabbitMQ.RabbitmqClient
 
   @default_prefetch_count 50
   @supported_options [

@@ -1,4 +1,4 @@
-defmodule BroadwayRabbitmq.RabbitmqClient do
+defmodule BroadwayRabbitMQ.RabbitmqClient do
   @moduledoc false
 
   alias AMQP.{Basic, Channel, Connection}
