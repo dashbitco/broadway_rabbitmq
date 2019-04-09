@@ -1,4 +1,4 @@
-defmodule BroadwayRabbitmq.Producer do
+defmodule BroadwayRabbitMQ.Producer do
   @moduledoc """
   A RabbitMQ producer for Broadway.
 
@@ -30,7 +30,7 @@ defmodule BroadwayRabbitmq.Producer do
         producers: [
           default: [
             module:
-              {BroadwayRabbitmq.Producer,
+              {BroadwayRabbitMQ.Producer,
               queue: "my_queue",
               connection: [
                 username: "user",
@@ -84,7 +84,7 @@ defmodule BroadwayRabbitmq.Producer do
   require Logger
 
   alias Broadway.{Message, Acknowledger, Producer}
-  alias BroadwayRabbitmq.Backoff
+  alias BroadwayRabbitMQ.Backoff
 
   @behaviour Acknowledger
   @behaviour Producer
@@ -92,7 +92,7 @@ defmodule BroadwayRabbitmq.Producer do
   @impl true
   def init(opts) do
     Process.flag(:trap_exit, true)
-    client = opts[:client] || BroadwayRabbitmq.AmqpClient
+    client = opts[:client] || BroadwayRabbitMQ.AmqpClient
 
     case client.init(opts) do
       {:error, message} ->

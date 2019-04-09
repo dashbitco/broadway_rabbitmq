@@ -1,4 +1,4 @@
-defmodule BroadwayRabbitmq.MixProject do
+defmodule BroadwayRabbitMQ.MixProject do
   use Mix.Project
 
   @version "0.1.0"
@@ -26,7 +26,7 @@ defmodule BroadwayRabbitmq.MixProject do
 
   defp deps do
     [
-      {:broadway, git: "https://github.com/plataformatec/broadway.git"},
+      {:broadway, "~> 0.2.0"},
       {:amqp, "~> 1.1"},
       {:ex_doc, ">= 0.19.0", only: :docs}
     ]
@@ -34,7 +34,7 @@ defmodule BroadwayRabbitmq.MixProject do
 
   defp docs do
     [
-      main: "BroadwayRabbitmq.Producer",
+      main: "BroadwayRabbitMQ.Producer",
       source_ref: "v#{@version}",
       source_url: "https://github.com/plataformatec/broadway_rabbitmq"
     ]

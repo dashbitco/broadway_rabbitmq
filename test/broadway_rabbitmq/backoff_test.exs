@@ -1,7 +1,7 @@
-defmodule BroadwayRabbitmq.BackoffTest do
+defmodule BroadwayRabbitMQ.BackoffTest do
   use ExUnit.Case, async: true
 
-  alias BroadwayRabbitmq.Backoff
+  alias BroadwayRabbitMQ.Backoff
 
   @moduletag backoff_min: 1_000
   @moduletag backoff_max: 30_000

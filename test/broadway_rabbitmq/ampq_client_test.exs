@@ -1,7 +1,7 @@
-defmodule BroadwayRabbitmq.AmqpClientTest do
+defmodule BroadwayRabbitMQ.AmqpClientTest do
   use ExUnit.Case
 
-  alias BroadwayRabbitmq.AmqpClient
+  alias BroadwayRabbitMQ.AmqpClient
 
   test "default options" do
     assert AmqpClient.init(queue: "queue") ==

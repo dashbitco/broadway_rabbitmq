@@ -1,8 +1,8 @@
-defmodule BroadwayRabbitmq.Backoff do
+defmodule BroadwayRabbitMQ.Backoff do
   @moduledoc false
   @compile :nowarn_deprecated_function
 
-  alias BroadwayRabbitmq.Backoff
+  alias BroadwayRabbitMQ.Backoff
 
   @default_type :rand_exp
   @min 1_000

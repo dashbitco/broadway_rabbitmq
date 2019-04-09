@@ -1,11 +1,14 @@
-# BroadwayRabbitmq
+# BroadwayRabbitMQ
 
-**TODO: Add description**
+A RabbitMQ connector for [Broadway](https://github.com/plataformatec/broadway).
+
+Documentation can be found at [https://hexdocs.pm/broadway_rabbitmq](https://hexdocs.pm/broadway_rabbitmq).
+For more details on using Broadway with RabbitMQ, please see the
+[RabbitMQ Guide](https://hexdocs.pm/broadway/rabbitmq.html).
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `broadway_rabbitmq` to your list of dependencies in `mix.exs`:
+Add `:broadway_rabbitmq` to the list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -15,9 +18,39 @@ def deps do
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/broadway_rabbitmq](https://hexdocs.pm/broadway_rabbitmq).
+## Usage
+
+Configure Broadway with one or more producers using `BroadwayRabbitMQ.Producer`:
+
+```elixir
+  defmodule MyBroadway do
+    use Broadway
+
+    def start_link(_opts) do
+      Broadway.start_link(__MODULE__,
+        name: __MODULE__,
+        producers: [
+          default: [
+            module: {BroadwayRabbitMQ.Producer,
+              queue: "my_queue",
+            },
+            stages: 2
+          ]
+        ],
+        processors: [
+          default: [
+            stages: 50
+          ]
+        ]
+      )
+    end
+
+    def handle_message(_, message, _) do
+      IO.inspect(message.data, label: "Got message")
+      message
+    end
+  end
+```
 
 ## License
 
