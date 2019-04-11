@@ -17,11 +17,15 @@ defmodule BroadwayRabbitMQ.Producer do
       See `AMQP.Basic.qos/2` for the full list of options. Pay attention that the
       `:global` option is not supported by Broadway since each producer holds only one
       channel per connection.
+    * `:requeue` - Optional. Defines a strategy for requeuing failed messages.
+      Possible values are: `:always` - always requeue, `:never` - never requeue,
+      `:unless_redelivered` - requeue the message unless it's been redelivered.
+      Default is `:never`.
     * `:backoff_min` - The minimum backoff interval (default: `1_000`)
     * `:backoff_max` - The maximum backoff interval (default: `30_000`)
     * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
-    to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for
-    random exponential (default: `:rand_exp`)
+       to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for
+       random exponential (default: `:rand_exp`)
 
   ## Example
 
@@ -32,6 +36,7 @@ defmodule BroadwayRabbitMQ.Producer do
             module:
               {BroadwayRabbitMQ.Producer,
               queue: "my_queue",
+              requeue: :unless_redelivered,
               connection: [
                 username: "user",
                 password: "password",
@@ -137,12 +142,14 @@ defmodule BroadwayRabbitMQ.Producer do
   end
 
   def handle_info({:basic_deliver, payload, meta}, state) do
-    %{channel: channel, client: client} = state
-    %{delivery_tag: tag} = meta
+    %{channel: channel, client: client, config: config} = state
+    %{delivery_tag: tag, redelivered: redelivered} = meta
 
     ack_data = %{
       delivery_tag: tag,
-      client: client
+      client: client,
+      redelivered: redelivered,
+      requeue: config[:requeue]
     }
 
     message = %Message{data: payload, acknowledger: {__MODULE__, channel, ack_data}}
@@ -199,10 +206,10 @@ defmodule BroadwayRabbitMQ.Producer do
 
   defp ack_messages(messages, channel, ack_func) do
     Enum.each(messages, fn msg ->
-      {client, delivery_tag} = extract_client_and_delivery_tag(msg)
+      {_, _, ack_data} = msg.acknowledger
 
       try do
-        apply(client, ack_func, [channel, delivery_tag])
+        apply_ack_func(ack_func, ack_data, channel)
       catch
         kind, reason ->
           Logger.error(Exception.format(kind, reason, System.stacktrace()))
@@ -210,9 +217,25 @@ defmodule BroadwayRabbitMQ.Producer do
     end)
   end
 
-  defp extract_client_and_delivery_tag(message) do
-    {_, _, %{client: client, delivery_tag: delivery_tag}} = message.acknowledger
-    {client, delivery_tag}
+  defp apply_ack_func(:ack, ack_data, channel) do
+    ack_data.client.ack(channel, ack_data.delivery_tag)
+  end
+
+  defp apply_ack_func(:reject, ack_data, channel) do
+    options = [requeue: requeue?(ack_data)]
+    ack_data.client.reject(channel, ack_data.delivery_tag, options)
+  end
+
+  defp requeue?(%{requeue: :always}) do
+    true
+  end
+
+  defp requeue?(%{requeue: :never}) do
+    false
+  end
+
+  defp requeue?(%{requeue: :unless_redelivered, redelivered: redelivered}) do
+    !redelivered
   end
 
   defp connect(state) do
