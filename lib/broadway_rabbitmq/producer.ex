@@ -156,8 +156,7 @@ defmodule BroadwayRabbitMQ.Producer do
     ack_data = %{
       delivery_tag: tag,
       client: client,
-      redelivered: redelivered,
-      requeue: config[:requeue]
+      requeue: requeue?(config[:requeue], redelivered)
     }
 
     message = %Message{data: payload, acknowledger: {__MODULE__, channel, ack_data}}
@@ -230,20 +229,20 @@ defmodule BroadwayRabbitMQ.Producer do
   end
 
   defp apply_ack_func(:reject, ack_data, channel) do
-    options = [requeue: requeue?(ack_data)]
+    options = [requeue: ack_data.requeue]
     ack_data.client.reject(channel, ack_data.delivery_tag, options)
   end
 
-  defp requeue?(%{requeue: :always}) do
+  defp requeue?(:once, redelivered) do
+    !redelivered
+  end
+
+  defp requeue?(:always, _) do
     true
   end
 
-  defp requeue?(%{requeue: :never}) do
+  defp requeue?(:never, _) do
     false
-  end
-
-  defp requeue?(%{requeue: :once, redelivered: redelivered}) do
-    !redelivered
   end
 
   defp connect(state) do
