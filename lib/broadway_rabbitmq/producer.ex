@@ -19,8 +19,8 @@ defmodule BroadwayRabbitMQ.Producer do
       channel per connection.
     * `:requeue` - Optional. Defines a strategy for requeuing failed messages.
       Possible values are: `:always` - always requeue, `:never` - never requeue,
-      `:unless_redelivered` - requeue the message unless it's been redelivered.
-      Default is `:never`.
+      `:once` - requeue it once when the message was first delivered. Reject it
+      without requeueing, if it's been redelivered. Default is `:never`.
     * `:backoff_min` - The minimum backoff interval (default: `1_000`)
     * `:backoff_max` - The maximum backoff interval (default: `30_000`)
     * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
@@ -36,7 +36,7 @@ defmodule BroadwayRabbitMQ.Producer do
             module:
               {BroadwayRabbitMQ.Producer,
               queue: "my_queue",
-              requeue: :unless_redelivered,
+              requeue: :once,
               connection: [
                 username: "user",
                 password: "password",
@@ -234,7 +234,7 @@ defmodule BroadwayRabbitMQ.Producer do
     false
   end
 
-  defp requeue?(%{requeue: :unless_redelivered, redelivered: redelivered}) do
+  defp requeue?(%{requeue: :once, redelivered: redelivered}) do
     !redelivered
   end
 

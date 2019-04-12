@@ -77,17 +77,17 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
       assert {:ok, "queue", _} = AmqpClient.init(queue: "queue")
     end
 
-    test ":requeue should be :never, :always or :unless_redelivered" do
+    test ":requeue should be :never, :always or :once" do
       {:ok, "queue", opts} = AmqpClient.init(queue: "queue", requeue: :never)
       assert opts[:requeue] == :never
       {:ok, "queue", opts} = AmqpClient.init(queue: "queue", requeue: :always)
       assert opts[:requeue] == :always
-      {:ok, "queue", opts} = AmqpClient.init(queue: "queue", requeue: :unless_redelivered)
-      assert opts[:requeue] == :unless_redelivered
+      {:ok, "queue", opts} = AmqpClient.init(queue: "queue", requeue: :once)
+      assert opts[:requeue] == :once
       {:error, reason} = AmqpClient.init(queue: "queue", requeue: :unsupported)
 
       assert reason ==
-               "expected :queue to be any of [:never, :always, :unless_redelivered], got: :unsupported"
+               "expected :queue to be any of [:never, :always, :once], got: :unsupported"
     end
   end
 end

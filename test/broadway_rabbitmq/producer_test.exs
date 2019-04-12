@@ -209,8 +209,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       stop_broadway(broadway)
     end
 
-    test "requeue messages unless it's been redelivered with requeue == :unless_redelivered" do
-      {:ok, broadway} = start_broadway(requeue: :unless_redelivered)
+    test "requeue messages unless it's been redelivered with requeue == :once" do
+      {:ok, broadway} = start_broadway(requeue: :once)
 
       deliver_messages(broadway, [1, :fail], redelivered: true)
       assert_receive {:reject, :fail, opts}

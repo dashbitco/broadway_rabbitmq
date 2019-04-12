@@ -25,7 +25,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   @requeue_options [
     :never,
     :always,
-    :unless_redelivered
+    :once
   ]
 
   @requeue_default_option :never
