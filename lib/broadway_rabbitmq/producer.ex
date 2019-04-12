@@ -27,6 +27,14 @@ defmodule BroadwayRabbitMQ.Producer do
        to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for
        random exponential (default: `:rand_exp`)
 
+  > Note: choose the requeue strategy carefully. If you set the value to `:never`
+  or `:once`, make sure you handle failed messages properly, either by logging
+  them somewhere or redirecting them to a dead-letter queue for future inspection.
+  By sticking with `:always`, pay attention that requeued messages by default will
+  be instantly redelivered, this may result in very high unnecessary workload.
+  One way to handle this is by using [Dead Letter Exchanges](https://www.rabbitmq.com/dlx.html)
+  and [TTL and Expiration](https://www.rabbitmq.com/ttl.html).
+
   ## Example
 
       Broadway.start_link(MyBroadway,
