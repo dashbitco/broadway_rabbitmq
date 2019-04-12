@@ -66,9 +66,9 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     @impl true
-    def reject(channel, delivery_tag) do
+    def reject(channel, delivery_tag, opts) do
       GenServer.call(channel.pid, :fake_basic_ack)
-      send(channel.test_pid, {:reject, delivery_tag})
+      send(channel.test_pid, {:reject, delivery_tag, opts})
     end
 
     @impl true
@@ -169,11 +169,61 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     assert_receive {:ack, 1}
     assert_receive {:ack, 2}
-    assert_receive {:reject, :fail}
+    assert_receive {:reject, :fail, _}
     assert_receive {:ack, 4}
     assert_receive {:ack, 5}
 
     stop_broadway(broadway)
+  end
+
+  describe "handle requeuing with :requeue option" do
+    test "always requeue messages with requeue == :always" do
+      {:ok, broadway} = start_broadway(requeue: :always)
+
+      deliver_messages(broadway, [1, :fail], redelivered: true)
+      assert_receive {:reject, :fail, opts}
+      assert opts[:requeue] == true
+
+      deliver_messages(broadway, [2, :fail], redelivered: false)
+      assert_receive {:reject, :fail, opts}
+      assert opts[:requeue] == true
+
+      refute_receive {:reject, :fail, _}
+
+      stop_broadway(broadway)
+    end
+
+    test "never requeue messages with requeue == :never" do
+      {:ok, broadway} = start_broadway(requeue: :never)
+
+      deliver_messages(broadway, [1, :fail], redelivered: true)
+      assert_receive {:reject, :fail, opts}
+      assert opts[:requeue] == false
+
+      deliver_messages(broadway, [2, :fail], redelivered: false)
+      assert_receive {:reject, :fail, opts}
+      assert opts[:requeue] == false
+
+      refute_receive {:reject, :fail, _}
+
+      stop_broadway(broadway)
+    end
+
+    test "requeue messages unless it's been redelivered with requeue == :once" do
+      {:ok, broadway} = start_broadway(requeue: :once)
+
+      deliver_messages(broadway, [1, :fail], redelivered: true)
+      assert_receive {:reject, :fail, opts}
+      assert opts[:requeue] == false
+
+      deliver_messages(broadway, [2, :fail], redelivered: false)
+      assert_receive {:reject, :fail, opts}
+      assert opts[:requeue] == true
+
+      refute_receive {:reject, :fail, _}
+
+      stop_broadway(broadway)
+    end
   end
 
   describe "prepare_for_draining" do
@@ -320,6 +370,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   defp start_broadway(opts \\ []) do
     connect_responses = Keyword.get(opts, :connect_responses, [])
     backoff_type = Keyword.get(opts, :backoff_type, :exp)
+    requeue = Keyword.get(opts, :requeue, :always)
 
     {:ok, connection_agent} = Agent.start_link(fn -> connect_responses end)
 
@@ -337,7 +388,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
              backoff_min: 10,
              backoff_max: 100,
              connection_agent: connection_agent,
-             qos: [prefetch_count: 10]},
+             qos: [prefetch_count: 10],
+             requeue: requeue},
           stages: 1
         ]
       ],
@@ -358,11 +410,12 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     :"Broadway#{System.unique_integer([:positive, :monotonic])}"
   end
 
-  defp deliver_messages(broadway, messages) do
+  defp deliver_messages(broadway, messages, opts \\ []) do
+    redelivered = Keyword.get(opts, :redelivered, false)
     producer = Broadway.Server.get_random_producer(broadway)
 
     Enum.each(messages, fn msg ->
-      send(producer, {:basic_deliver, msg, %{delivery_tag: msg}})
+      send(producer, {:basic_deliver, msg, %{delivery_tag: msg, redelivered: redelivered}})
     end)
   end
 

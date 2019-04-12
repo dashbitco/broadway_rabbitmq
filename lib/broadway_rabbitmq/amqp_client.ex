@@ -18,19 +18,30 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :qos,
     :backoff_min,
     :backoff_max,
-    :backoff_type
+    :backoff_type,
+    :requeue
   ]
+
+  @requeue_options [
+    :never,
+    :always,
+    :once
+  ]
+
+  @requeue_default_option :always
 
   @impl true
   def init(opts) do
     with {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
          {:ok, queue} <- validate(opts, :queue),
+         {:ok, requeue} <- validate(opts, :requeue, @requeue_default_option),
          {:ok, conn_opts} <- validate_conn_opts(opts),
          {:ok, qos_opts} <- validate_qos_opts(opts) do
       {:ok, queue,
        %{
          connection: conn_opts,
-         qos: qos_opts
+         qos: qos_opts,
+         requeue: requeue
        }}
     end
   end
@@ -50,8 +61,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   @impl true
-  def reject(channel, delivery_tag) do
-    Basic.reject(channel, delivery_tag)
+  def reject(channel, delivery_tag, opts) do
+    Basic.reject(channel, delivery_tag, opts)
   end
 
   @impl true
@@ -80,6 +91,9 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   defp validate_option(:queue, value) when not is_binary(value) or value == "",
     do: validation_error(:queue, "a non empty string", value)
+
+  defp validate_option(:requeue, value) when value not in @requeue_options,
+    do: validation_error(:queue, "any of #{inspect(@requeue_options)}", value)
 
   defp validate_option(_, value), do: {:ok, value}
 

@@ -5,7 +5,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
   test "default options" do
     assert AmqpClient.init(queue: "queue") ==
-             {:ok, "queue", %{connection: [], qos: [prefetch_count: 50]}}
+             {:ok, "queue", %{connection: [], qos: [prefetch_count: 50], requeue: :always}}
   end
 
   describe "validate init options" do
@@ -32,11 +32,13 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
       options = [
         queue: "queue",
+        requeue: :once,
         connection: connection,
         qos: qos
       ]
 
-      assert AmqpClient.init(options) == {:ok, "queue", %{connection: connection, qos: qos}}
+      assert AmqpClient.init(options) ==
+               {:ok, "queue", %{connection: connection, qos: qos, requeue: :once}}
     end
 
     test "unsupported options for Broadway" do
@@ -70,6 +72,23 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
       {:ok, queue, _} = AmqpClient.init(queue: "my_queue")
       assert queue == "my_queue"
+    end
+
+    test ":requeue is optional" do
+      assert {:ok, "queue", _} = AmqpClient.init(queue: "queue")
+    end
+
+    test ":requeue should be :never, :always or :once" do
+      {:ok, "queue", opts} = AmqpClient.init(queue: "queue", requeue: :never)
+      assert opts[:requeue] == :never
+      {:ok, "queue", opts} = AmqpClient.init(queue: "queue", requeue: :always)
+      assert opts[:requeue] == :always
+      {:ok, "queue", opts} = AmqpClient.init(queue: "queue", requeue: :once)
+      assert opts[:requeue] == :once
+      {:error, reason} = AmqpClient.init(queue: "queue", requeue: :unsupported)
+
+      assert reason ==
+               "expected :queue to be any of [:never, :always, :once], got: :unsupported"
     end
   end
 end
