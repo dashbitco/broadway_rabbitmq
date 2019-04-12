@@ -28,7 +28,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :once
   ]
 
-  @requeue_default_option :never
+  @requeue_default_option :always
 
   @impl true
   def init(opts) do

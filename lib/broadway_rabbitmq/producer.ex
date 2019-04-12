@@ -20,7 +20,7 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:requeue` - Optional. Defines a strategy for requeuing failed messages.
       Possible values are: `:always` - always requeue, `:never` - never requeue,
       `:once` - requeue it once when the message was first delivered. Reject it
-      without requeueing, if it's been redelivered. Default is `:never`.
+      without requeueing, if it's been redelivered. Default is `:always`.
     * `:backoff_min` - The minimum backoff interval (default: `1_000`)
     * `:backoff_max` - The maximum backoff interval (default: `30_000`)
     * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
