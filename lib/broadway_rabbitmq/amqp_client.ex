@@ -144,6 +144,10 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     |> validate_supported_opts(group, supported)
   end
 
+  defp validate_supported_opts("amqp" <> _ = uri, :connection, _supported_opts) when is_binary(uri) do
+   {:ok, uri}
+  end
+
   defp validate_supported_opts(opts, group_name, supported_opts) do
     opts
     |> Keyword.keys()

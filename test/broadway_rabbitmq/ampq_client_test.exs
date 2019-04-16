@@ -45,6 +45,13 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
                 %{connection: connection, qos: qos, requeue: :once, metadata: metadata}}
     end
 
+    test "configure connection via uri" do
+      connection = "amqp://guest:guest@127.0.0.1"
+
+      assert AmqpClient.init([queue: "queue", connection: connection]) ==
+               {:ok, "queue", %{connection: connection, qos: [prefetch_count: 50], requeue: :always}}
+    end
+
     test "unsupported options for Broadway" do
       assert AmqpClient.init(queue: "queue", option_1: 1, option_2: 2) ==
                {:error, "Unsupported options [:option_1, :option_2] for \"Broadway\""}
