@@ -144,8 +144,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     |> validate_supported_opts(group, supported)
   end
 
-  defp validate_supported_opts("amqp" <> _ = uri, :connection, _supported_opts)
-       when is_binary(uri) do
+  defp validate_supported_opts("amqp" <> _ = uri, :connection, _supported_opts) do
     {:ok, uri}
   end
 
