@@ -159,7 +159,7 @@ defmodule BroadwayRabbitMQ.Producer do
       requeue: requeue?(config[:requeue], redelivered)
     }
 
-    message = %Message{data: payload, acknowledger: {__MODULE__, channel, ack_data}}
+    message = %Message{data: payload, metadata: meta, acknowledger: {__MODULE__, channel, ack_data}}
 
     {:noreply, [message], state}
   end
