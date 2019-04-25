@@ -1,7 +1,7 @@
 %{
   "amqp": {:hex, :amqp, "1.1.1", "e902a8e112c9c476995440c4beac867f054dc531de208adc01aa411dd07754a2", [:mix], [{:amqp_client, "~> 3.7.11", [hex: :amqp_client, repo: "hexpm", optional: false]}, {:goldrush, "~> 0.1.0", [hex: :goldrush, repo: "hexpm", optional: false]}, {:jsx, "~> 2.9", [hex: :jsx, repo: "hexpm", optional: false]}, {:lager, "~> 3.6.5", [hex: :lager, repo: "hexpm", optional: false]}, {:rabbit_common, "~> 3.7.11", [hex: :rabbit_common, repo: "hexpm", optional: false]}, {:ranch, "~> 1.7", [hex: :ranch, repo: "hexpm", optional: false]}, {:recon, "~> 2.3.6", [hex: :recon, repo: "hexpm", optional: false]}], "hexpm"},
   "amqp_client": {:hex, :amqp_client, "3.7.11", "e692b3ba59e6df93c13cec5feefb62c956fcdbae341565101c7668375cc387fe", [:make, :rebar3], [{:rabbit_common, "3.7.11", [hex: :rabbit_common, repo: "hexpm", optional: false]}], "hexpm"},
-  "broadway": {:hex, :broadway, "0.2.0", "b92703f9b0bca9bc8aa201ea6ab70be9ca53ed74b47674b340f445a218a3427b", [:mix], [{:gen_stage, "~> 0.14", [hex: :gen_stage, repo: "hexpm", optional: false]}], "hexpm"},
+  "broadway": {:git, "https://github.com/plataformatec/broadway.git", "89e308b4f9d4f511f41169e167f84ddd46b650eb", []},
   "earmark": {:hex, :earmark, "1.3.2", "b840562ea3d67795ffbb5bd88940b1bed0ed9fa32834915125ea7d02e35888a5", [:mix], [], "hexpm"},
   "ex_doc": {:hex, :ex_doc, "0.19.3", "3c7b0f02851f5fc13b040e8e925051452e41248f685e40250d7e40b07b9f8c10", [:mix], [{:earmark, "~> 1.2", [hex: :earmark, repo: "hexpm", optional: false]}, {:makeup_elixir, "~> 0.10", [hex: :makeup_elixir, repo: "hexpm", optional: false]}], "hexpm"},
   "gen_stage": {:hex, :gen_stage, "0.14.1", "9d46723fda072d4f4bb31a102560013f7960f5d80ea44dcb96fd6304ed61e7a4", [:mix], [], "hexpm"},
