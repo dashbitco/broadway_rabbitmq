@@ -26,6 +26,7 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
        to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for
        random exponential (default: `:rand_exp`)
+    * `:metadata` - The list of AMQP metadata fields to copy (default: `[]`) 
 
   > Note: choose the requeue strategy carefully. If you set the value to `:never`
   or `:once`, make sure you handle failed messages properly, either by logging
