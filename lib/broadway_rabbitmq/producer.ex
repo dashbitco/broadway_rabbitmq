@@ -161,7 +161,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
     message = %Message{
       data: payload,
-      metadata: meta,
+      metadata: Map.take(meta, config[:metadata]),
       acknowledger: {__MODULE__, channel, ack_data}
     }
 

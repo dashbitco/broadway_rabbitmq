@@ -371,6 +371,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     connect_responses = Keyword.get(opts, :connect_responses, [])
     backoff_type = Keyword.get(opts, :backoff_type, :exp)
     requeue = Keyword.get(opts, :requeue, :always)
+    metadata = []
 
     {:ok, connection_agent} = Agent.start_link(fn -> connect_responses end)
 
@@ -389,7 +390,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
              backoff_max: 100,
              connection_agent: connection_agent,
              qos: [prefetch_count: 10],
-             requeue: requeue},
+             requeue: requeue,
+             metadata: metadata},
           stages: 1
         ]
       ],
