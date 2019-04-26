@@ -100,8 +100,11 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   defp validate_option(:requeue, value) when value not in @requeue_options,
     do: validation_error(:queue, "any of #{inspect(@requeue_options)}", value)
 
-  defp validate_option(:metadata, value) when not is_list(value),
-    do: validation_error(:metadata, "a list of atoms", value)
+  defp validate_option(:metadata, value) when is_list(value) do
+    if Enum.all?(value, &is_atom/1),
+      do: {:ok, value},
+      else: validation_error(:metadata, "a list of atoms", value)
+  end
 
   defp validate_option(_, value), do: {:ok, value}
 

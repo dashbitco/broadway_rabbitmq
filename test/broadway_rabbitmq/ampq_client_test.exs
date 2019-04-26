@@ -94,5 +94,14 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
       assert reason ==
                "expected :queue to be any of [:never, :always, :once], got: :unsupported"
     end
+
+    test ":metadata should be a list of atoms" do
+      {:ok, "queue", opts} = AmqpClient.init(queue: "queue", metadata: [:routing_key, :headers])
+      assert opts[:metadata] == [:routing_key, :headers]
+
+      assert AmqpClient.init(queue: "queue", metadata: ["routing_key", :headers]) ==
+               {:error,
+                "expected :metadata to be a list of atoms, got: [\"routing_key\", :headers]"}
+    end
   end
 end
