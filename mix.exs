@@ -26,7 +26,7 @@ defmodule BroadwayRabbitMQ.MixProject do
 
   defp deps do
     [
-      {:broadway, github: "plataformatec/broadway"},
+      {:broadway, "~> 0.3.0"},
       {:amqp, "~> 1.1"},
       {:ex_doc, ">= 0.19.0", only: :docs}
     ]
