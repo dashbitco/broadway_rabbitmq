@@ -153,8 +153,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   test "set metadata" do
     metadata = [:headers]
-    {:producer, producer, _} = 
-      BroadwayRabbitMQ.Producer.init(queue: "test", metadata: metadata)
+    {:producer, producer, _} = BroadwayRabbitMQ.Producer.init(queue: "test", metadata: metadata)
 
     assert producer[:config][:metadata] == metadata
   end
