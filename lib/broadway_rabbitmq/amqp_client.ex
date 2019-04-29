@@ -19,7 +19,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :backoff_min,
     :backoff_max,
     :backoff_type,
-    :requeue
+    :requeue,
+    :metadata
   ]
 
   @requeue_options [
@@ -28,11 +29,14 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :once
   ]
 
+  @default_metadata []
+
   @requeue_default_option :always
 
   @impl true
   def init(opts) do
     with {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
+         {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
          {:ok, queue} <- validate(opts, :queue),
          {:ok, requeue} <- validate(opts, :requeue, @requeue_default_option),
          {:ok, conn_opts} <- validate_conn_opts(opts),
@@ -41,7 +45,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
        %{
          connection: conn_opts,
          qos: qos_opts,
-         requeue: requeue
+         requeue: requeue,
+         metadata: metadata
        }}
     end
   end
@@ -94,6 +99,12 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   defp validate_option(:requeue, value) when value not in @requeue_options,
     do: validation_error(:queue, "any of #{inspect(@requeue_options)}", value)
+
+  defp validate_option(:metadata, value) when is_list(value) do
+    if Enum.all?(value, &is_atom/1),
+      do: {:ok, value},
+      else: validation_error(:metadata, "a list of atoms", value)
+  end
 
   defp validate_option(_, value), do: {:ok, value}
 

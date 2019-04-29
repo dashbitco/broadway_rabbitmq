@@ -99,7 +99,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     def handle_message(_, message, %{test_pid: test_pid}) do
       channel = get_channel(message)
-      send(test_pid, {:message_handled, message.data, channel})
+      send(test_pid, {:message_handled, message, channel})
 
       case message.data do
         :fail ->
@@ -149,6 +149,13 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     {:producer, _, options} = BroadwayRabbitMQ.Producer.init(queue: "test", qos: qos)
 
     assert options[:buffer_size] == 60
+  end
+
+  test "set metadata" do
+    metadata = [:headers]
+    {:producer, producer, _} = BroadwayRabbitMQ.Producer.init(queue: "test", metadata: metadata)
+
+    assert producer[:config][:metadata] == metadata
   end
 
   test "forward messages delivered by the channel" do
@@ -267,15 +274,15 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       assert_receive {:setup_channel, :ok, channel_1}
 
       deliver_messages(broadway, [1, 2])
-      assert_receive {:message_handled, 1, ^channel_1}
-      assert_receive {:message_handled, 2, ^channel_1}
+      assert_receive {:message_handled, %Message{data: 1}, ^channel_1}
+      assert_receive {:message_handled, %Message{data: 2}, ^channel_1}
 
       deliver_messages(broadway, [:break_conn])
       assert_receive {:setup_channel, :ok, channel_2}
 
       deliver_messages(broadway, [3, 4])
-      assert_receive {:message_handled, 3, ^channel_2}
-      assert_receive {:message_handled, 4, ^channel_2}
+      assert_receive {:message_handled, %Message{data: 3}, ^channel_2}
+      assert_receive {:message_handled, %Message{data: 4}, ^channel_2}
 
       assert channel_1.pid != channel_2.pid
       assert channel_1.conn.pid != channel_2.conn.pid
@@ -289,8 +296,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
       deliver_messages(broadway, [1, :break_conn])
 
-      assert_receive {:message_handled, 1, ^channel}
-      assert_receive {:message_handled, :break_conn, ^channel}
+      assert_receive {:message_handled, %Message{data: 1}, ^channel}
+      assert_receive {:message_handled, %Message{data: :break_conn}, ^channel}
 
       refute_receive {:ack, 1}
       refute_receive {:ack, :break_conn}
@@ -371,6 +378,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     connect_responses = Keyword.get(opts, :connect_responses, [])
     backoff_type = Keyword.get(opts, :backoff_type, :exp)
     requeue = Keyword.get(opts, :requeue, :always)
+    metadata = Keyword.get(opts, :metadata, [])
 
     {:ok, connection_agent} = Agent.start_link(fn -> connect_responses end)
 
@@ -389,7 +397,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
              backoff_max: 100,
              connection_agent: connection_agent,
              qos: [prefetch_count: 10],
-             requeue: requeue},
+             requeue: requeue,
+             metadata: metadata},
           stages: 1
         ]
       ],
@@ -413,9 +422,14 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   defp deliver_messages(broadway, messages, opts \\ []) do
     redelivered = Keyword.get(opts, :redelivered, false)
     producer = Broadway.Server.get_random_producer(broadway)
+    extra_metadata = Keyword.get(opts, :extra_metadata, %{})
 
     Enum.each(messages, fn msg ->
-      send(producer, {:basic_deliver, msg, %{delivery_tag: msg, redelivered: redelivered}})
+      send(
+        producer,
+        {:basic_deliver, msg,
+         Map.merge(%{delivery_tag: msg, redelivered: redelivered}, extra_metadata)}
+      )
     end)
   end
 

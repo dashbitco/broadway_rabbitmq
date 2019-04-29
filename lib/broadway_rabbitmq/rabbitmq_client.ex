@@ -5,7 +5,8 @@ defmodule BroadwayRabbitMQ.RabbitmqClient do
 
   @typep config :: %{
            connection: keyword,
-           qos: keyword
+           qos: keyword,
+           metadata: list(atom())
          }
 
   @callback init(opts :: any) :: {:ok, queue_name :: String.t(), config} | {:error, any}
