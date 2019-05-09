@@ -151,11 +151,20 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     assert options[:buffer_size] == 60
   end
 
-  test "set metadata" do
-    metadata = [:headers]
-    {:producer, producer, _} = BroadwayRabbitMQ.Producer.init(queue: "test", metadata: metadata)
+  test "retrieve only selected metadata" do
+    {:ok, broadway} = start_broadway(metadata: [:routing_key, :content_type])
 
-    assert producer[:config][:metadata] == metadata
+    deliver_messages(broadway, 1..2,
+      extra_metadata: %{
+        routing_key: "FAKE_ROTING_KEY",
+        headers: "FAKE_HEADERS",
+        content_type: "FAKE_CONTENT_TYPE",
+        expiration: "FAKE_EXPIRATION"
+      }
+    )
+
+    assert_receive {:message_handled, %Message{metadata: meta}, _}
+    assert meta == %{content_type: "FAKE_CONTENT_TYPE", routing_key: "FAKE_ROTING_KEY"}
   end
 
   test "forward messages delivered by the channel" do
