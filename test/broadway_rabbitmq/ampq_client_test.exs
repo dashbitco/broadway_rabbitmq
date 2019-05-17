@@ -50,7 +50,12 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
       assert AmqpClient.init(queue: "queue", connection: connection) ==
                {:ok, "queue",
-                %{connection: connection, qos: [prefetch_count: 50], requeue: :always}}
+                %{
+                  connection: connection,
+                  qos: [prefetch_count: 50],
+                  requeue: :always,
+                  metadata: []
+                }}
     end
 
     test "unsupported options for Broadway" do
