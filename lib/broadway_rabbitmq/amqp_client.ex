@@ -158,7 +158,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  defp validate_uri_options("amqps" <> _ = uri) do
+  defp validate_uri_options(uri) do
     uri_query = case URI.parse(uri) do
                    %URI{query: nil}   -> nil
                    %URI{query: query} -> query |> URI.decode_query()
@@ -178,28 +178,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
                                                   tls_options: tls_options},
                                                   uri_query, uri)
       {:error, reason}                        -> {:error, "Critically failed parsing AMQP URI: #{inspect reason}"}
-    end
-  end
-
-  defp validate_uri_options("amqp" <> _ = uri ) do
-    uri_query = case URI.parse(uri) do
-                   %URI{query: nil}   -> nil
-                   %URI{query: query} -> query |> URI.decode_query()
-                end
-
-    case uri |> to_charlist() |> :amqp_uri.parse() do
-    {:ok,
-      {:amqp_params_network, _username, _password,
-      _vhost, _location, _port,
-      channel_max, frame_max,
-      heartbeat, connection_timeout, :none,
-      _functions_for_erlang_module, _, _ }} -> validate_uri_options(%{
-                                                channel_max: channel_max,
-                                                frame_max: frame_max,
-                                                heartbeat: heartbeat,
-                                                connection_timeout: connection_timeout,
-                                                tls_options: :none}, uri_query, uri)
-    {:error, reason}                        -> {:error, "Critically failed parsing AMQP URI: #{inspect reason}"}
     end
   end
 
