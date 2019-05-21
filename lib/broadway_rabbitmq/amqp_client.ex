@@ -177,7 +177,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
                                                   connection_timeout: connection_timeout,
                                                   tls_options: tls_options},
                                                   uri_query, uri)
-      {:error, error}                        -> {:error, error}
+      {:error, reason}                        -> {:error, "Critically failed parsing AMQP URI: #{inspect reason}"}
     end
   end
 
@@ -199,7 +199,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
                                                 heartbeat: heartbeat,
                                                 connection_timeout: connection_timeout,
                                                 tls_options: :none}, uri_query, uri)
-    {:error, error}                        -> {:error, error}
+    {:error, reason}                        -> {:error, "Critically failed parsing AMQP URI: #{inspect reason}"}
     end
   end
 
