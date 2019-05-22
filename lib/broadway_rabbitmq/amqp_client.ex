@@ -159,25 +159,31 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   defp validate_uri_options(uri) do
-    uri_query = case URI.parse(uri) do
-                   %URI{query: nil}   -> nil
-                   %URI{query: query} -> query |> URI.decode_query()
-                end
+    uri_query =
+      case URI.parse(uri) do
+        %URI{query: nil} -> nil
+        %URI{query: query} -> query |> URI.decode_query()
+      end
 
     case uri |> to_charlist() |> :amqp_uri.parse() do
       {:ok,
-        {:amqp_params_network, _username, _password,
-        _vhost, _location, _port,
-        channel_max, frame_max,
-        heartbeat, connection_timeout,tls_options,
-        _functions_for_erlang_module, _, _}} -> validate_uri_options(%{
-                                                  channel_max: channel_max,
-                                                  frame_max: frame_max,
-                                                  heartbeat: heartbeat,
-                                                  connection_timeout: connection_timeout,
-                                                  tls_options: tls_options},
-                                                  uri_query, uri)
-      {:error, reason}                        -> {:error, "Critically failed parsing AMQP URI: #{inspect reason}"}
+       {:amqp_params_network, _username, _password, _vhost, _location, _port, channel_max,
+        frame_max, heartbeat, connection_timeout, tls_options, _functions_for_erlang_module, _,
+        _}} ->
+        validate_uri_options(
+          %{
+            channel_max: channel_max,
+            frame_max: frame_max,
+            heartbeat: heartbeat,
+            connection_timeout: connection_timeout,
+            tls_options: tls_options
+          },
+          uri_query,
+          uri
+        )
+
+      {:error, reason} ->
+        {:error, "Critically failed parsing AMQP URI: #{inspect(reason)}"}
     end
   end
 
@@ -192,14 +198,17 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   ###
   # If you supply tls options over the ampq unsecured (ampq://) protocol :amqp
   # dumps them silently but if you supply it ampqs protocol without tls options
-  #:amqp kicks out a useful warning.
+  # :amqp kicks out a useful warning.
   ###
 
-
-  defp validate_uri_options(%{tls_options: :none} = options, %{"cacertfile" => _} = uri_query, uri) do
+  defp validate_uri_options(
+         %{tls_options: :none} = options,
+         %{"cacertfile" => _} = uri_query,
+         uri
+       ) do
     warn_tls_config_over_unsecure()
     remaining_uri_query = Map.delete(uri_query, "cacertfile")
-    validate_uri_options(options,remaining_uri_query, uri)
+    validate_uri_options(options, remaining_uri_query, uri)
   end
 
   defp validate_uri_options(%{tls_options: :none} = options, %{"certfile" => _} = uri_query, uri) do
@@ -208,7 +217,11 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     validate_uri_options(options, remaining_uri_query, uri)
   end
 
-  defp validate_uri_options(%{tls_options: :none} = options, %{"server_name_indication" => _} = uri_query, uri) do
+  defp validate_uri_options(
+         %{tls_options: :none} = options,
+         %{"server_name_indication" => _} = uri_query,
+         uri
+       ) do
     warn_tls_config_over_unsecure()
     remaining_uri_query = Map.delete(uri_query, "server_name_indication")
     validate_uri_options(options, remaining_uri_query, uri)
@@ -232,7 +245,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   # job.
   ######
 
-  defp validate_uri_options(%{tls_options: tls_options} = options, uri_query, uri) when is_list(tls_options) do
+  defp validate_uri_options(%{tls_options: tls_options} = options, uri_query, uri)
+       when is_list(tls_options) do
     verify = Keyword.get(tls_options, :verify)
     validate_verify_tls_option(verify)
     post_tls_options = Map.delete(options, :tls_options)
@@ -244,38 +258,38 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   ######
 
   defp validate_uri_options(_options, uri_query, uri) do
-    valid_uri_options_list = ["", #this catches extra & that :amqp ignores
-                              "channel_max",
-                              "connection_timeout",
-                              "frame_max",
-                              "heartbeat",
-                              "cacertfile",
-                              "certfile",
-                              "server_name_indication",
-                              "keyfile",
-                              "verify"
-                             ]
-
+    # this catches extra & that :amqp ignores
+    valid_uri_options_list = [
+      "",
+      "channel_max",
+      "connection_timeout",
+      "frame_max",
+      "heartbeat",
+      "cacertfile",
+      "certfile",
+      "server_name_indication",
+      "keyfile",
+      "verify"
+    ]
 
     unknown_uri_params = remove_known_uri_keys(valid_uri_options_list, uri_query) |> Map.to_list()
 
     test_remaining_options(valid_uri_options_list |> tl, unknown_uri_params, uri)
   end
 
-
   defp test_remaining_options(known_uri_params, [unknown_param | rest], uri) do
+    rated_list =
+      for {key, _value} <- [unknown_param],
+          uri_param <- known_uri_params do
+        {uri_param, key, String.jaro_distance(uri_param, key)}
+      end
 
-    rated_list = for {key, _value} <- [unknown_param],
-                     uri_param <- known_uri_params do
-                     {uri_param, key, String.jaro_distance(uri_param, key)}
-                 end
-
-    {real_option, you_said, _} = rated_list
-                                 |> List.keysort(2)
-                                 |> List.last()
+    {real_option, you_said, _} =
+      rated_list
+      |> List.keysort(2)
+      |> List.last()
 
     did_you_mean_warning(you_said, real_option)
-
 
     test_remaining_options(known_uri_params, rest, uri)
   end
@@ -293,7 +307,9 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   defp warn_tls_config_over_unsecure() do
-    Logger.warn("You passed tls options to an unsecure protocol(ampq://).If you want to use tls then please specify amqps://")
+    Logger.warn(
+      "You passed tls options to an unsecure protocol(ampq://).If you want to use tls then please specify amqps://"
+    )
   end
 
   defp validate_verify_tls_option(:verify_none) do
@@ -307,19 +323,33 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   defp validate_verify_tls_option(unknown_option) do
     verify_peer_distance = Atom.to_string(unknown_option) |> String.jaro_distance("verify_peer")
     verify_none_distance = Atom.to_string(unknown_option) |> String.jaro_distance("verify_none")
-    return_warning_for_verify_tls_option(verify_none_distance,verify_peer_distance, unknown_option)
+
+    return_warning_for_verify_tls_option(
+      verify_none_distance,
+      verify_peer_distance,
+      unknown_option
+    )
   end
 
-  defp return_warning_for_verify_tls_option(verify_peer, verify_none, unknown_option) when verify_peer > verify_none do
-    Logger.warn("You set your tls option verify as #{inspect(unknown_option)} did you mean #{:verify_peer}?")
+  defp return_warning_for_verify_tls_option(verify_peer, verify_none, unknown_option)
+       when verify_peer > verify_none do
+    Logger.warn(
+      "You set your tls option verify as #{inspect(unknown_option)} did you mean #{:verify_peer}?"
+    )
   end
 
-  defp return_warning_for_verify_tls_option(verify_peer, verify_none, unknown_option) when verify_peer < verify_none do
-    Logger.warn("You set your tls option verify as #{inspect(unknown_option)} did you mean #{:verify_none}?")
+  defp return_warning_for_verify_tls_option(verify_peer, verify_none, unknown_option)
+       when verify_peer < verify_none do
+    Logger.warn(
+      "You set your tls option verify as #{inspect(unknown_option)} did you mean #{:verify_none}?"
+    )
   end
 
   defp did_you_mean_warning(you_said, did_you_mean) do
-    Logger.warn("You attempted to pass #{inspect(you_said)} as an option did you mean #{inspect(did_you_mean)}?")
+    Logger.warn(
+      "You attempted to pass #{inspect(you_said)} as an option did you mean #{
+        inspect(did_you_mean)
+      }?"
+    )
   end
-
 end
