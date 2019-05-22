@@ -211,7 +211,11 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     validate_uri_options(options, remaining_uri_query, uri)
   end
 
-  defp validate_uri_options(%{tls_options: :none} = options, %{"certfile" => _} = uri_query, uri) do
+  defp validate_uri_options(
+         %{tls_options: :none} = options,
+         %{"certfile" => _} = uri_query,
+         uri
+       ) do
     warn_tls_config_over_unsecure()
     remaining_uri_query = Map.delete(uri_query, "certfile")
     validate_uri_options(options, remaining_uri_query, uri)
@@ -227,13 +231,21 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     validate_uri_options(options, remaining_uri_query, uri)
   end
 
-  defp validate_uri_options(%{tls_options: :none} = options, %{"keyfile" => _} = uri_query, uri) do
+  defp validate_uri_options(
+         %{tls_options: :none} = options,
+         %{"keyfile" => _} = uri_query,
+         uri
+       ) do
     warn_tls_config_over_unsecure()
     remaining_uri_query = Map.delete(uri_query, "keyfile")
     validate_uri_options(options, remaining_uri_query, uri)
   end
 
-  defp validate_uri_options(%{tls_options: :none} = options, %{"verify" => _} = uri_query, uri) do
+  defp validate_uri_options(
+         %{tls_options: :none} = options,
+         %{"verify" => _} = uri_query,
+         uri
+       ) do
     warn_tls_config_over_unsecure()
     remaining_uri_query = Map.delete(uri_query, "verify")
     validate_uri_options(options, remaining_uri_query, uri)
