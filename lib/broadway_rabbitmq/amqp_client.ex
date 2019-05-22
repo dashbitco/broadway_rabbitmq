@@ -206,7 +206,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          %{"cacertfile" => _} = uri_query,
          uri
        ) do
-    warn_tls_config_over_unsecure()
+    warn_tls_config_over_unsecure("cacertfile")
     remaining_uri_query = Map.delete(uri_query, "cacertfile")
     validate_uri_options(options, remaining_uri_query, uri)
   end
@@ -216,7 +216,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          %{"certfile" => _} = uri_query,
          uri
        ) do
-    warn_tls_config_over_unsecure()
+    warn_tls_config_over_unsecure("certfile")
     remaining_uri_query = Map.delete(uri_query, "certfile")
     validate_uri_options(options, remaining_uri_query, uri)
   end
@@ -226,7 +226,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          %{"server_name_indication" => _} = uri_query,
          uri
        ) do
-    warn_tls_config_over_unsecure()
+    warn_tls_config_over_unsecure("server_name_indication")
     remaining_uri_query = Map.delete(uri_query, "server_name_indication")
     validate_uri_options(options, remaining_uri_query, uri)
   end
@@ -236,7 +236,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          %{"keyfile" => _} = uri_query,
          uri
        ) do
-    warn_tls_config_over_unsecure()
+    warn_tls_config_over_unsecure("keyfile")
     remaining_uri_query = Map.delete(uri_query, "keyfile")
     validate_uri_options(options, remaining_uri_query, uri)
   end
@@ -246,7 +246,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          %{"verify" => _} = uri_query,
          uri
        ) do
-    warn_tls_config_over_unsecure()
+    warn_tls_config_over_unsecure("verify")
     remaining_uri_query = Map.delete(uri_query, "verify")
     validate_uri_options(options, remaining_uri_query, uri)
   end
@@ -318,9 +318,9 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     uri_query
   end
 
-  defp warn_tls_config_over_unsecure() do
+  defp warn_tls_config_over_unsecure(tls_key) do
     Logger.warn(
-      "You passed tls options to an unsecure protocol(ampq://).If you want to use tls then please specify amqps://"
+      "You passed the tls option #{inspect(tls_key)}to an unsecure protocol(ampq://). If you want to use tls then please specify amqps://"
     )
   end
 
