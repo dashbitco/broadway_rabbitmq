@@ -48,7 +48,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     test "configure connection via uri" do
       connection = "amqp://guest:guest@127.0.0.1"
 
-      assert {:ok, "queue", %{connection: connection}} = AmqpClient.init(queue: "queue", connection: connection)
+      assert {:ok, "queue", %{connection: ^connection}} = AmqpClient.init(queue: "queue", connection: connection)
     end
 
     test "unsupported options for Broadway" do

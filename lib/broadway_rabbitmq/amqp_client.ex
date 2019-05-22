@@ -190,10 +190,9 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   ###
-  # If you supply tls options over the ampq protocol :amqp dumps them silently
-  # but if you supply it ampqs protocol without tls options :amqp kicks out a
-  # useful warning. This is part is designed to check a typo in a more obvious
-  # fashion.
+  # If you supply tls options over the ampq unsecured (ampq://) protocol :amqp
+  # dumps them silently but if you supply it ampqs protocol without tls options
+  #:amqp kicks out a useful warning.
   ###
 
 
