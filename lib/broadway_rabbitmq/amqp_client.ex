@@ -144,6 +144,13 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     |> validate_supported_opts(group, supported)
   end
 
+  defp validate_supported_opts(uri, :connection, _) when is_binary(uri) do
+    case uri |> to_charlist |> :amqp_uri.parse() do
+      {:ok, _amqp_params} -> {:ok, uri}
+      {:error, reason} -> {:error, "Failed parsing AMQP URI: #{inspect(reason)}"}
+    end
+  end
+
   defp validate_supported_opts(opts, group_name, supported_opts) do
     opts
     |> Keyword.keys()
