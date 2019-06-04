@@ -10,8 +10,8 @@ defmodule BroadwayRabbitMQ.Producer do
   ## Options
 
     * `:queue` - Required. The name of the queue.
-    * `:connection` - Optional. Defines a set of options used by the RabbitMQ
-      client to open the connection with the RabbitMQ broker. See
+    * `:connection` - Optional. Defines an AMQP URI or a set of options used by
+      the RabbitMQ client to open the connection with the RabbitMQ broker. See
       `AMQP.Connection.open/1` for the full list of options.
     * `:qos` - Optional. Defines a set of prefetch options used by the RabbitMQ client.
       See `AMQP.Basic.qos/2` for the full list of options. Pay attention that the

@@ -183,7 +183,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         )
 
       {:error, reason} ->
-        {:error, "Critically failed parsing AMQP URI: #{inspect(reason)}"}
+        {:error, "Failed parsing AMQP URI: #{inspect(reason)}"}
     end
   end
 
