@@ -151,6 +151,29 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     assert options[:buffer_size] == 60
   end
 
+  test "producer :buffer_size and :buffer_keep can be overridden" do
+    {:producer, _, options} =
+      BroadwayRabbitMQ.Producer.init(
+        queue: "test",
+        qos: [prefetch_count: 12],
+        buffer_size: 100,
+        buffer_keep: :first
+      )
+
+    assert options[:buffer_size] == 100
+    assert options[:buffer_keep] == :first
+  end
+
+  test ":prefetch_count set to 0 requires explicit :buffer_size setting" do
+    assert_raise(
+      ArgumentError,
+      ":prefetch_count is 0, specify :buffer_size explicitly",
+      fn ->
+        BroadwayRabbitMQ.Producer.init(queue: "test", qos: [prefetch_count: 0])
+      end
+    )
+  end
+
   test "retrieve only selected metadata" do
     {:ok, broadway} = start_broadway(metadata: [:routing_key, :content_type])
 

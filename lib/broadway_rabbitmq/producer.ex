@@ -17,6 +17,14 @@ defmodule BroadwayRabbitMQ.Producer do
       See `AMQP.Basic.qos/2` for the full list of options. Pay attention that the
       `:global` option is not supported by Broadway since each producer holds only one
       channel per connection.
+    * `:buffer_size` - Optional, but required if `:prefetch_count` under `:qos` is
+      set to `0`. Defines the size of the buffer to store events without demand.
+      Can be :infinity to signal no limit on the buffer size. This is used to
+      configure the GenStage producer, see the `GenStage` docs for more details.
+      Defaults to `:prefetch_count * 5`.
+    * `:buffer_keep` - Optional. Used in the GenStage producer configuration.
+      Defines whether the `:first` or `:last` entries should be kept on the
+      buffer in case the buffer size is exceeded. Defaults to `:last`.
     * `:requeue` - Optional. Defines a strategy for requeuing failed messages.
       Possible values are: `:always` - always requeue, `:never` - never requeue,
       `:once` - requeue it once when the message was first delivered. Reject it
@@ -26,7 +34,7 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
        to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for
        random exponential (default: `:rand_exp`)
-    * `:metadata` - The list of AMQP metadata fields to copy (default: `[]`) 
+    * `:metadata` - The list of AMQP metadata fields to copy (default: `[]`)
 
   > Note: choose the requeue strategy carefully. If you set the value to `:never`
   or `:once`, make sure you handle failed messages properly, either by logging
@@ -64,11 +72,12 @@ defmodule BroadwayRabbitMQ.Producer do
 
   ## Back-pressure and `:prefetch_count`
 
-  Unlike the RabittMQ client that has a default `:prefetch_count` = 0,
+  Unlike the RabbitMQ client that has a default `:prefetch_count` = 0,
   which disables back-pressure, BroadwayRabbitMQ overwrite the default
   value to `50` enabling the back-pressure mechanism. You can still define
   it as `0`, however, if you do this, make sure the machine has enough
-  resources to handle the number of messages coming from the broker.
+  resources to handle the number of messages coming from the broker, and set
+  `:buffer_size` to an appropriate value.
 
   This is important because the BroadwayRabbitMQ producer does not work
   as a poller like BroadwaySQS. Instead, it maintains an active connection
@@ -107,6 +116,7 @@ defmodule BroadwayRabbitMQ.Producer do
   def init(opts) do
     Process.flag(:trap_exit, true)
     client = opts[:client] || BroadwayRabbitMQ.AmqpClient
+    {gen_stage_opts, opts} = Keyword.split(opts, [:buffer_size, :buffer_keep])
 
     case client.init(opts) do
       {:error, message} ->
@@ -116,7 +126,7 @@ defmodule BroadwayRabbitMQ.Producer do
         send(self(), :connect)
 
         prefetch_count = config[:qos][:prefetch_count]
-        options = [buffer_size: prefetch_count * 5]
+        options = producer_options(gen_stage_opts, prefetch_count)
 
         {:producer,
          %{
@@ -214,6 +224,18 @@ defmodule BroadwayRabbitMQ.Producer do
         Logger.error("Could not cancel producer while draining. Channel is #{error}")
         :ok
     end
+  end
+
+  defp producer_options(opts, 0) do
+    if opts[:buffer_size] do
+      opts
+    else
+      raise ArgumentError, ":prefetch_count is 0, specify :buffer_size explicitly"
+    end
+  end
+
+  defp producer_options(opts, prefetch_count) do
+    Keyword.put_new(opts, :buffer_size, prefetch_count * 5)
   end
 
   defp ack_messages(messages, channel, ack_func) do
