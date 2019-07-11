@@ -52,6 +52,28 @@ Configure Broadway with one or more producers using `BroadwayRabbitMQ.Producer`:
   end
 ```
 
+### Metadata
+
+Use the `metadata` option with a list of atoms of the attributes we want to retrieve from AMQP producer:
+
+```elixir
+Broadway.start_link(MyBroadway,
+  name: MyBroadway,
+  producers: [
+    default: [
+      module: {BroadwayRabbitMQ.Producer,
+        queue: "my_queue",
+        metadata: [
+          :routing_key,
+          :redelivered,
+          :headers
+        ]
+      }
+    ]
+  ]
+)
+```
+
 ## License
 
 Copyright 2019 Plataformatec
