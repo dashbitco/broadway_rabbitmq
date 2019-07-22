@@ -348,6 +348,24 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
   end
 
+  describe "handle consumer cancellation" do
+    test "open a new connection/channel and keep consuming messages" do
+      {:ok, broadway} = start_broadway()
+      assert_receive {:setup_channel, :ok, channel_1}
+
+      producer = get_producer(broadway)
+
+      send(producer, {:basic_cancel, %{delievery_tag: "my-delivery-tag"}})
+
+      assert_receive {:setup_channel, :ok, channel_2}
+
+      assert channel_1.pid != channel_2.pid
+      assert channel_1.conn.pid != channel_2.conn.pid
+
+      stop_broadway(broadway)
+    end
+  end
+
   describe "handle connection refused" do
     test "log the error and try to reconnect" do
       assert capture_log(fn ->
