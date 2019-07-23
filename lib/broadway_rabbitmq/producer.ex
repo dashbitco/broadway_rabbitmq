@@ -151,9 +151,10 @@ defmodule BroadwayRabbitMQ.Producer do
     {:noreply, [], %{state | consumer_tag: tag}}
   end
 
+  # RabbitMQ sends this in a few scenarios, like if the queue this consumer
+  # is consuming from gets deleted. See https://www.rabbitmq.com/consumer-cancel.html.
   def handle_info({:basic_cancel, _}, state) do
-    # TODO: Better treat this differently
-    {:stop, :normal, %{state | consumer_tag: nil}}
+    {:noreply, [], connect(state)}
   end
 
   def handle_info({:basic_cancel_ok, _}, state) do
