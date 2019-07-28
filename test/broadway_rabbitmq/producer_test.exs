@@ -33,7 +33,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     @impl true
     def init(opts) do
-      {:ok, opts[:queue], opts}
+      {:ok, opts}
     end
 
     @impl true
