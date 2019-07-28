@@ -94,21 +94,27 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     end
 
     test ":queue is required" do
-      assert AmqpClient.init([]) == {:error, "expected :queue to be a non empty string, got: nil"}
+      assert AmqpClient.init([]) == {:error, "expected :queue to be a string, got: nil"}
 
       assert AmqpClient.init(queue: nil) ==
-               {:error, "expected :queue to be a non empty string, got: nil"}
+               {:error, "expected :queue to be a string, got: nil"}
     end
 
-    test ":queue should be a non empty string" do
-      assert AmqpClient.init(queue: "") ==
-               {:error, "expected :queue to be a non empty string, got: \"\""}
-
+    test ":queue should be a string" do
       assert AmqpClient.init(queue: :an_atom) ==
-               {:error, "expected :queue to be a non empty string, got: :an_atom"}
+               {:error, "expected :queue to be a string, got: :an_atom"}
 
       {:ok, config} = AmqpClient.init(queue: "my_queue")
       assert config.queue == "my_queue"
+    end
+
+    test "queue shouldn't be an empty string if :declare is not present" do
+      assert AmqpClient.init(queue: "") ==
+               {:error,
+                "can't use \"\" (server autogenerate) as the queue name without the :declare"}
+
+      assert {:ok, config} = AmqpClient.init(queue: "", declare: [])
+      assert config.queue == ""
     end
 
     test ":requeue is optional" do

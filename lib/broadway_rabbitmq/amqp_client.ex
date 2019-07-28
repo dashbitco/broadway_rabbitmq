@@ -125,8 +125,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     validate_option(key, opts[key] || default)
   end
 
-  defp validate_option(:queue, value) when not is_binary(value) or value == "",
-    do: validation_error(:queue, "a non empty string", value)
+  defp validate_option(:queue, value) when not is_binary(value),
+    do: validation_error(:queue, "a string", value)
 
   defp validate_option(:requeue, value) when value not in @requeue_options,
     do: validation_error(:queue, "any of #{inspect(@requeue_options)}", value)

@@ -127,7 +127,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   test "raise an ArgumentError with proper message when client options are invalid" do
     assert_raise(
       ArgumentError,
-      "invalid options given to BroadwayRabbitMQ.AmqpClient.init/1, expected :queue to be a non empty string, got: nil",
+      "invalid options given to BroadwayRabbitMQ.AmqpClient.init/1, expected :queue to be a string, got: nil",
       fn ->
         BroadwayRabbitMQ.Producer.init(queue: nil)
       end
