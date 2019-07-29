@@ -4,7 +4,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   alias AMQP.{
     Connection,
     Channel,
-    Basic
+    Basic,
+    Queue
   }
 
   require Logger
@@ -20,7 +21,9 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :backoff_max,
     :backoff_type,
     :requeue,
-    :metadata
+    :metadata,
+    :declare,
+    :bindings
   ]
 
   @requeue_options [
@@ -40,10 +43,15 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          {:ok, queue} <- validate(opts, :queue),
          {:ok, requeue} <- validate(opts, :requeue, @requeue_default_option),
          {:ok, conn_opts} <- validate_conn_opts(opts),
+         {:ok, declare_opts} <- validate_declare_opts(opts, queue),
+         {:ok, bindings} <- validate_bindings(opts),
          {:ok, qos_opts} <- validate_qos_opts(opts) do
-      {:ok, queue,
+      {:ok,
        %{
          connection: conn_opts,
+         queue: queue,
+         declare_opts: declare_opts,
+         bindings: bindings,
          qos: qos_opts,
          requeue: requeue,
          metadata: metadata
@@ -55,8 +63,31 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   def setup_channel(config) do
     with {:ok, conn} <- Connection.open(config.connection),
          {:ok, channel} <- Channel.open(conn),
-         :ok <- Basic.qos(channel, config.qos) do
+         :ok <- Basic.qos(channel, config.qos),
+         {:ok, queue} <- maybe_declare_queue(channel, config.queue, config.declare_opts),
+         :ok <- maybe_bind_queue(channel, queue, config.bindings) do
       {:ok, channel}
+    end
+  end
+
+  defp maybe_declare_queue(_channel, queue, _declare_opts = nil) do
+    {:ok, queue}
+  end
+
+  defp maybe_declare_queue(channel, queue, declare_opts) do
+    with {:ok, %{queue: queue}} <- Queue.declare(channel, queue, declare_opts) do
+      {:ok, queue}
+    end
+  end
+
+  defp maybe_bind_queue(_channel, _queue, _bindings = []) do
+    :ok
+  end
+
+  defp maybe_bind_queue(channel, queue, [{exchange, opts} | bindings]) do
+    case Queue.bind(channel, queue, exchange, opts) do
+      :ok -> maybe_bind_queue(channel, queue, bindings)
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -71,8 +102,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   @impl true
-  def consume(channel, queue) do
-    {:ok, consumer_tag} = Basic.consume(channel, queue)
+  def consume(channel, config) do
+    {:ok, consumer_tag} = Basic.consume(channel, config.queue)
     consumer_tag
   end
 
@@ -94,8 +125,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     validate_option(key, opts[key] || default)
   end
 
-  defp validate_option(:queue, value) when not is_binary(value) or value == "",
-    do: validation_error(:queue, "a non empty string", value)
+  defp validate_option(:queue, value) when not is_binary(value),
+    do: validation_error(:queue, "a string", value)
 
   defp validate_option(:requeue, value) when value not in @requeue_options,
     do: validation_error(:queue, "any of #{inspect(@requeue_options)}", value)
@@ -104,6 +135,12 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     if Enum.all?(value, &is_atom/1),
       do: {:ok, value},
       else: validation_error(:metadata, "a list of atoms", value)
+  end
+
+  defp validate_option(:bindings, value) when is_list(value) do
+    if Enum.all?(value, &is_tuple/1),
+      do: {:ok, value},
+      else: validation_error(:bindings, "a list of bindings (keyword lists)", value)
   end
 
   defp validate_option(_, value), do: {:ok, value}
@@ -132,6 +169,37 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     ]
 
     validate_supported_opts(conn_opts, group, supported)
+  end
+
+  defp validate_declare_opts(opts, queue) do
+    case Keyword.fetch(opts, :declare) do
+      :error when queue == "" ->
+        {:error, "can't use \"\" (server autogenerate) as the queue name without the :declare"}
+
+      :error ->
+        {:ok, nil}
+
+      {:ok, declare_opts} ->
+        supported = [:durable, :auto_delete, :exclusive, :passive]
+        validate_supported_opts(declare_opts, :declare, supported)
+    end
+  end
+
+  defp validate_bindings(opts) do
+    with {:ok, bindings} <- validate(opts, :bindings, _default = []) do
+      Enum.reduce_while(bindings, {:ok, bindings}, fn
+        {exchange, binding_opts}, acc when is_binary(exchange) ->
+          supported = [:routing_key, :nowait, :arguments]
+
+          case validate_supported_opts(binding_opts, :bindings, supported) do
+            {:ok, _bindings_opts} -> {:cont, acc}
+            {:error, reason} -> {:halt, {:error, reason}}
+          end
+
+        {other, _opts}, _acc ->
+          {:error, "the exchange in a binding should be a string, got: #{inspect(other)}"}
+      end)
+    end
   end
 
   defp validate_qos_opts(opts) do
