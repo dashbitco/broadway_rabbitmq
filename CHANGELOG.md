@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.0 (2019-08-06)
+
+  * Add `:declare` and `:bindings` options to producers
+  * Handle consumer cancellation by reconnecting
+
 ## v0.3.0 (2019-06-06)
 
   * Allow overriding `:buffer_size` and `:buffer_keep`

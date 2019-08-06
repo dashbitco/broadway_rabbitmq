@@ -1,7 +1,7 @@
 defmodule BroadwayRabbitMQ.MixProject do
   use Mix.Project
 
-  @version "0.3.0"
+  @version "0.4.0"
   @description "A RabbitMQ connector for Broadway"
 
   def project do
