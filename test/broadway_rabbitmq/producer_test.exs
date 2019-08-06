@@ -485,7 +485,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   defp get_producer(broadway, key \\ :default, index \\ 1) do
     name = Process.info(broadway)[:registered_name]
-    :"#{name}.Producer_#{key}_#{index}"
+    :"#{name}.Broadway.Producer_#{key}_#{index}"
   end
 
   defp get_backoff_timeout(broadway) do
