@@ -324,6 +324,9 @@ defmodule BroadwayRabbitMQ.Producer do
       {:error, {:auth_failure, 'Disconnected'}} ->
         handle_backoff(state)
 
+      {:error, {:socket_closed_unexpectedly, :"connection.start"}} ->
+        handle_backoff(state)
+
       {:error, :econnrefused} ->
         handle_backoff(state)
     end
