@@ -329,6 +329,9 @@ defmodule BroadwayRabbitMQ.Producer do
 
       {:error, :econnrefused} ->
         handle_backoff(state)
+
+      {:error, :unknown_host} ->
+        handle_backoff(state)
     end
   end
 
