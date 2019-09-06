@@ -174,7 +174,8 @@ defmodule BroadwayRabbitMQ.Producer do
            consumer_tag: nil,
            config: config,
            backoff: Backoff.new(opts),
-           conn_ref: nil
+           conn_ref: nil,
+           channel_ref: nil
          }, options}
     end
   end
@@ -219,6 +220,10 @@ defmodule BroadwayRabbitMQ.Producer do
   end
 
   def handle_info({:DOWN, ref, :process, _pid, _reason}, %{conn_ref: ref} = state) do
+    {:noreply, [], connect(state)}
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, %{channel_ref: ref} = state) do
     {:noreply, [], connect(state)}
   end
 
@@ -316,10 +321,19 @@ defmodule BroadwayRabbitMQ.Producer do
     # TODO: Treat other setup errors properly
     case client.setup_channel(config) do
       {:ok, channel} ->
-        ref = Process.monitor(channel.conn.pid)
+        conn_ref = Process.monitor(channel.conn.pid)
+        channel_ref = Process.monitor(channel.pid)
         backoff = backoff && Backoff.reset(backoff)
         consumer_tag = client.consume(channel, config)
-        %{state | channel: channel, consumer_tag: consumer_tag, backoff: backoff, conn_ref: ref}
+
+        %{
+          state
+          | channel: channel,
+            consumer_tag: consumer_tag,
+            backoff: backoff,
+            conn_ref: conn_ref,
+            channel_ref: channel_ref
+        }
 
       {:error, {:auth_failure, 'Disconnected'}} ->
         handle_backoff(state)
@@ -345,6 +359,13 @@ defmodule BroadwayRabbitMQ.Producer do
         backoff
       end
 
-    %{state | channel: nil, consumer_tag: nil, backoff: new_backoff, conn_ref: nil}
+    %{
+      state
+      | channel: nil,
+        consumer_tag: nil,
+        backoff: new_backoff,
+        conn_ref: nil,
+        channel_ref: nil
+    }
   end
 end
