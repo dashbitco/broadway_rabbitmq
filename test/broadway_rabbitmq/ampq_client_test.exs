@@ -144,8 +144,8 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     end
 
     test ":bindings should be a list of tuples" do
-      {:ok, opts} = AmqpClient.init(queue: "queue", bindings: [{"my-exchange", [nowait: true]}])
-      assert opts[:bindings] == [{"my-exchange", [nowait: true]}]
+      {:ok, opts} = AmqpClient.init(queue: "queue", bindings: [{"my-exchange", [no_wait: true]}])
+      assert opts[:bindings] == [{"my-exchange", [no_wait: true]}]
 
       assert AmqpClient.init(queue: "queue", bindings: [:something, :else]) ==
                {:error,
