@@ -180,7 +180,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         {:ok, nil}
 
       {:ok, declare_opts} ->
-        supported = [:durable, :auto_delete, :exclusive, :passive]
+        supported = [:durable, :auto_delete, :exclusive, :passive, :no_wait, :arguments]
         validate_supported_opts(declare_opts, :declare, supported)
     end
   end
@@ -189,7 +189,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     with {:ok, bindings} <- validate(opts, :bindings, _default = []) do
       Enum.reduce_while(bindings, {:ok, bindings}, fn
         {exchange, binding_opts}, acc when is_binary(exchange) ->
-          supported = [:routing_key, :nowait, :arguments]
+          supported = [:routing_key, :no_wait, :arguments]
 
           case validate_supported_opts(binding_opts, :bindings, supported) do
             {:ok, _bindings_opts} -> {:cont, acc}
