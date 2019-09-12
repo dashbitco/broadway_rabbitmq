@@ -27,11 +27,6 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:buffer_keep` - Optional. Used in the GenStage producer configuration.
       Defines whether the `:first` or `:last` entries should be kept on the
       buffer in case the buffer size is exceeded. Defaults to `:last`.
-    * `:requeue` - *This option is deprecated*. Use `:on_success`/`:on_failure`
-      instead. Defines a strategy for requeuing failed messages.
-      Possible values are: `:always` - always requeue, `:never` - never requeue,
-      `:once` - requeue it once when the message was first delivered. Reject it
-      without requeueing, if it's been redelivered. Default is `:always`.
     * `:backoff_min` - The minimum backoff interval (default: `1_000`)
     * `:backoff_max` - The maximum backoff interval (default: `30_000`)
     * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
