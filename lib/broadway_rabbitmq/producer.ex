@@ -175,7 +175,9 @@ defmodule BroadwayRabbitMQ.Producer do
            config: config,
            backoff: Backoff.new(opts),
            conn_ref: nil,
-           channel_ref: nil
+           channel_ref: nil,
+           on_success: :ack,
+           on_failure: :reject
          }, options}
     end
   end
@@ -207,13 +209,15 @@ defmodule BroadwayRabbitMQ.Producer do
     ack_data = %{
       delivery_tag: tag,
       client: client,
-      requeue: requeue?(config[:requeue], redelivered)
+      requeue: requeue?(config[:requeue], redelivered),
+      on_success: state.on_success,
+      on_failure: state.on_failure
     }
 
     message = %Message{
       data: payload,
       metadata: Map.take(meta, config[:metadata]),
-      acknowledger: {__MODULE__, channel, ack_data}
+      acknowledger: {__MODULE__, _ack_ref = channel, ack_data}
     }
 
     {:noreply, [message], state}
@@ -247,9 +251,25 @@ defmodule BroadwayRabbitMQ.Producer do
   end
 
   @impl Acknowledger
-  def ack(channel, successful, failed) do
+  def ack(_ack_ref = channel, successful, failed) do
     ack_messages(successful, channel, :ack)
     ack_messages(failed, channel, :reject)
+  end
+
+  if {:configure, 3} in Broadway.Acknowledger.behaviour_info(:callbacks) do
+    @impl Acknowledger
+    def configure(ack_ref, ack_data, options) do
+      new_ack_data =
+        Map.new(options, fn
+          {:on_success, on_success} -> {:on_success, on_success}
+          {:on_failure, on_failure} -> {:on_failure, on_failure}
+          {other, _value} -> raise ArgumentError, "unsupported option #{inspect(other)}"
+        end)
+
+      ack_data = Map.merge(ack_data, new_ack_data)
+
+      {:ok, ack_data}
+    end
   end
 
   @impl Producer
