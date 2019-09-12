@@ -27,10 +27,6 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:buffer_keep` - Optional. Used in the GenStage producer configuration.
       Defines whether the `:first` or `:last` entries should be kept on the
       buffer in case the buffer size is exceeded. Defaults to `:last`.
-    * `:requeue` - Optional. Defines a strategy for requeuing failed messages.
-      Possible values are: `:always` - always requeue, `:never` - never requeue,
-      `:once` - requeue it once when the message was first delivered. Reject it
-      without requeueing, if it's been redelivered. Default is `:always`.
     * `:backoff_min` - The minimum backoff interval (default: `1_000`)
     * `:backoff_max` - The maximum backoff interval (default: `30_000`)
     * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
@@ -52,6 +48,14 @@ defmodule BroadwayRabbitMQ.Producer do
       to `exchange_name` through `AMQP.Queue.bind/4` using `binding_options` as
       the options. Bindings are idempotent so you can bind the same queue to the
       same exchange multiple times.
+    * `:on_success` - configures the acking behaviour for successful messages.
+      See the "Acking" section below for all the possible values. Defaults to
+      `:ack`. This option can also be changed for each message through
+      `Broadway.Message.configure_ack/2`.
+    * `:on_failure` - configures the acking behaviour for failed messages.
+      See the "Acking" section below for all the possible values. Defaults to
+      `:reject_and_requeue`. This option can also be changed for each message through
+      `Broadway.Message.configure_ack/2`.
 
   > Note: choose the requeue strategy carefully. If you set the value to `:never`
   or `:once`, make sure you handle failed messages properly, either by logging
@@ -70,7 +74,6 @@ defmodule BroadwayRabbitMQ.Producer do
             module:
               {BroadwayRabbitMQ.Producer,
               queue: "my_queue",
-              requeue: :once,
               connection: [
                 username: "user",
                 password: "password",
@@ -120,7 +123,10 @@ defmodule BroadwayRabbitMQ.Producer do
 
   ## Declaring queues and binding them to exchanges
 
-  In RabbitMQ, it's common for consumers to declare the queue they're going to consume from and bind it to the appropriate exchange when they start up. You can do these steps (either or both) when setting up your Broadway pipeline through the `:declare` and `:bindings` options.
+  In RabbitMQ, it's common for consumers to declare the queue they're going
+  to consume from and bind it to the appropriate exchange when they start up.
+  You can do these steps (either or both) when setting up your Broadway pipeline
+  through the `:declare` and `:bindings` options.
 
       Broadway.start_link(MyBroadway,
         name: MyBroadway,
@@ -139,6 +145,30 @@ defmodule BroadwayRabbitMQ.Producer do
         ]
       )
 
+  ## Acking
+
+  You can use the `:on_success` and `:on_failure` options to control how messages
+  are acked on RabbitMQ. By default, successful messages are acked and failed
+  messages are rejected. You can set `:on_success` and `:on_failure` when starting
+  the RabbitMQ producer, or change them for each message through
+  `Broadway.Message.configure_ack/2`.
+
+  Here is the list of all possible values supported by `:on_success` and `:on_failure`:
+
+    * `:ack` - acknowledge the message. RabbitMQ will mark the message as acked and
+      will not redeliver it to any other consumer.
+
+    * `:reject` - rejects the message without requeuing (basically, discards the message).
+      RabbitMQ will not redeliver the message to any other consumer.
+
+    * `:reject_and_requeue` - rejects the message and tells RabbitMQ to requeue it so
+      that it can be delivered to a consumer again. `:reject_and_requeue` always
+      requeues the message.
+
+    * `:reject_and_requeue_once` - rejects the message and tells RabbitMQ to requeue it
+      the first time. If a message was already requeued and redelivered, it will be
+      rejected and not requeued again.
+
   """
 
   use GenStage
@@ -156,6 +186,8 @@ defmodule BroadwayRabbitMQ.Producer do
     Process.flag(:trap_exit, true)
     client = opts[:client] || BroadwayRabbitMQ.AmqpClient
     {gen_stage_opts, opts} = Keyword.split(opts, [:buffer_size, :buffer_keep])
+    {success_failure_opts, opts} = Keyword.split(opts, [:on_success, :on_failure])
+    assert_valid_success_failure_opts!(success_failure_opts)
 
     case client.init(opts) do
       {:error, message} ->
@@ -167,6 +199,16 @@ defmodule BroadwayRabbitMQ.Producer do
         prefetch_count = config[:qos][:prefetch_count]
         options = producer_options(gen_stage_opts, prefetch_count)
 
+        on_failure =
+          Keyword.get_lazy(success_failure_opts, :on_failure, fn ->
+            case config[:requeue] do
+              nil -> :reject_and_requeue
+              :always -> :reject_and_requeue
+              :once -> :reject_and_requeue_once
+              :never -> :reject
+            end
+          end)
+
         {:producer,
          %{
            client: client,
@@ -175,7 +217,9 @@ defmodule BroadwayRabbitMQ.Producer do
            config: config,
            backoff: Backoff.new(opts),
            conn_ref: nil,
-           channel_ref: nil
+           channel_ref: nil,
+           on_success: Keyword.get(success_failure_opts, :on_success, :ack),
+           on_failure: on_failure
          }, options}
     end
   end
@@ -207,13 +251,15 @@ defmodule BroadwayRabbitMQ.Producer do
     ack_data = %{
       delivery_tag: tag,
       client: client,
-      requeue: requeue?(config[:requeue], redelivered)
+      redelivered: redelivered,
+      on_success: state.on_success,
+      on_failure: state.on_failure
     }
 
     message = %Message{
       data: payload,
       metadata: Map.take(meta, config[:metadata]),
-      acknowledger: {__MODULE__, channel, ack_data}
+      acknowledger: {__MODULE__, _ack_ref = channel, ack_data}
     }
 
     {:noreply, [message], state}
@@ -247,9 +293,32 @@ defmodule BroadwayRabbitMQ.Producer do
   end
 
   @impl Acknowledger
-  def ack(channel, successful, failed) do
-    ack_messages(successful, channel, :ack)
-    ack_messages(failed, channel, :reject)
+  def ack(_ack_ref = channel, successful, failed) do
+    ack_messages(successful, channel, :successful)
+    ack_messages(failed, channel, :failed)
+  end
+
+  @impl Acknowledger
+  def configure(_channel, ack_data, options) do
+    assert_valid_success_failure_opts!(options)
+    ack_data = Map.merge(ack_data, Map.new(options))
+    {:ok, ack_data}
+  end
+
+  defp assert_valid_success_failure_opts!(options) do
+    assert_supported_value = fn
+      value when value in [:ack, :reject, :reject_and_requeue, :reject_and_requeue_once] ->
+        :ok
+
+      other ->
+        raise ArgumentError, "unsupported value for on_success/on_failure: #{inspect(other)}"
+    end
+
+    Enum.each(options, fn
+      {:on_success, value} -> assert_supported_value.(value)
+      {:on_failure, value} -> assert_supported_value.(value)
+      {other, _value} -> raise ArgumentError, "unsupported configure option #{inspect(other)}"
+    end)
   end
 
   @impl Producer
@@ -282,12 +351,15 @@ defmodule BroadwayRabbitMQ.Producer do
     Keyword.put_new(opts, :buffer_size, prefetch_count * 5)
   end
 
-  defp ack_messages(messages, channel, ack_func) do
+  defp ack_messages(messages, channel, kind) do
     Enum.each(messages, fn msg ->
-      {_, _, ack_data} = msg.acknowledger
+      {_module, _channel, ack_data} = msg.acknowledger
 
       try do
-        apply_ack_func(ack_func, ack_data, channel)
+        case kind do
+          :successful -> apply_ack_func(ack_data.on_success, ack_data, channel)
+          :failed -> apply_ack_func(ack_data.on_failure, ack_data, channel)
+        end
       catch
         kind, reason ->
           Logger.error(Exception.format(kind, reason, System.stacktrace()))
@@ -299,22 +371,15 @@ defmodule BroadwayRabbitMQ.Producer do
     ack_data.client.ack(channel, ack_data.delivery_tag)
   end
 
-  defp apply_ack_func(:reject, ack_data, channel) do
-    options = [requeue: ack_data.requeue]
+  defp apply_ack_func(reject, ack_data, channel)
+       when reject in [:reject, :reject_and_requeue, :reject_and_requeue_once] do
+    options = [requeue: requeue?(reject, ack_data.redelivered)]
     ack_data.client.reject(channel, ack_data.delivery_tag, options)
   end
 
-  defp requeue?(:once, redelivered) do
-    !redelivered
-  end
-
-  defp requeue?(:always, _) do
-    true
-  end
-
-  defp requeue?(:never, _) do
-    false
-  end
+  defp requeue?(:reject, _redelivered), do: false
+  defp requeue?(:reject_and_requeue, _redelivered), do: true
+  defp requeue?(:reject_and_requeue_once, redelivered), do: !redelivered
 
   defp connect(state) do
     %{client: client, config: config, backoff: backoff} = state
