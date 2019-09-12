@@ -54,11 +54,13 @@ defmodule BroadwayRabbitMQ.Producer do
       the options. Bindings are idempotent so you can bind the same queue to the
       same exchange multiple times.
     * `:on_success` - configures the acking behaviour for successful messages.
-      See the "Acking" section below. Defaults to `:ack`. This option can also
-      be changed for each message through `Broadway.Message.configure_ack/2`.
+      See the "Acking" section below for all the possible values. Defaults to
+      `:ack`. This option can also be changed for each message through
+      `Broadway.Message.configure_ack/2`.
     * `:on_failure` - configures the acking behaviour for failed messages.
-      See the "Acking" section below. Defaults to `:reject`. This option can also
-      be changed for each message through `Broadway.Message.configure_ack/2`.
+      See the "Acking" section below for all the possible values. Defaults to
+      `:reject_and_requeue`. This option can also be changed for each message through
+      `Broadway.Message.configure_ack/2`.
 
   > Note: choose the requeue strategy carefully. If you set the value to `:never`
   or `:once`, make sure you handle failed messages properly, either by logging
@@ -155,6 +157,23 @@ defmodule BroadwayRabbitMQ.Producer do
   messages are rejected. You can set `:on_success` and `:on_failure` when starting
   the RabbitMQ producer, or change them for each message through
   `Broadway.Message.configure_ack/2`.
+
+  Here is the list of all possible values supported by `:on_success` and `:on_failure`:
+
+    * `:ack` - acknowledge the message. RabbitMQ will mark the message as acked and
+      will not redeliver it to any other consumer.
+
+    * `:reject` - rejects the message without requeuing (basically, discards the message).
+      RabbitMQ will not redeliver the message to any other consumer.
+
+    * `:reject_and_requeue` - rejects the message and tells RabbitMQ to requeue it so
+      that it can be delivered to a consumer again. `:reject_and_requeue` always
+      requeues the message.
+
+    * `:reject_and_requeue_once` - rejects the message and tells RabbitMQ to requeue it
+      the first time. If a message was already requeued and redelivered, it will be
+      rejected and not requeued again.
+
   """
 
   use GenStage
