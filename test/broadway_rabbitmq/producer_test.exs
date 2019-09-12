@@ -109,6 +109,14 @@ defmodule BroadwayRabbitMQ.ProducerTest do
           Process.exit(channel.conn.pid, :shutdown)
           message
 
+        {:configure, options, :fail} ->
+          message
+          |> Message.configure_ack(options)
+          |> Message.failed("failed")
+
+        {:configure, options, _} ->
+          Message.configure_ack(message, options)
+
         _ ->
           message
       end
@@ -213,6 +221,57 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     assert_receive {:ack, 5}
 
     stop_broadway(broadway)
+  end
+
+  describe "controlling on_success/on_failure behavior" do
+    test "setting on_success/on_failure when starting the producer" do
+      {:ok, broadway} = start_broadway(on_success: :reject, on_failure: :ack)
+
+      deliver_messages(broadway, [1, 2, :fail, 4])
+
+      assert_receive {:reject, 1, _}
+      assert_receive {:reject, 2, _}
+      assert_receive {:ack, :fail}
+      assert_receive {:reject, 4, _}
+    end
+
+    test "overriding on_success/on_failure through Broadway.Message.configure_ack/2" do
+      {:ok, broadway} = start_broadway()
+
+      deliver_messages(broadway, [
+        {:configure, [on_success: :reject], 1},
+        {:configure, [on_failure: :ack], :fail}
+      ])
+
+      assert_receive {:reject, {:configure, _opts, 1}, _}
+      assert_receive {:ack, {:configure, _opts, :fail}}
+    end
+
+    test "passing unsupported options to Broadway.Message.configure_ack/2" do
+      {:ok, broadway} = start_broadway()
+
+      log =
+        capture_log(fn ->
+          deliver_messages(broadway, [{:configure, [unknown: 1], 1}])
+
+          assert_receive {:reject, {:configure, _opts, 1}, _}
+        end)
+
+      assert log =~ "unsupported configure option :unknown"
+    end
+
+    test "setting on_success/on_failure to an unsupported value raises an error" do
+      {:ok, broadway} = start_broadway()
+
+      log =
+        capture_log(fn ->
+          deliver_messages(broadway, [{:configure, [on_success: :wat], 1}])
+
+          assert_receive {:reject, {:configure, _opts, 1}, _}
+        end)
+
+      assert log =~ "unsupported value for on_success/on_failure: :wat"
+    end
   end
 
   describe "handle requeuing with :requeue option" do
@@ -429,6 +488,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     backoff_type = Keyword.get(opts, :backoff_type, :exp)
     requeue = Keyword.get(opts, :requeue, :always)
     metadata = Keyword.get(opts, :metadata, [])
+    on_success = Keyword.get(opts, :on_success, :ack)
+    on_failure = Keyword.get(opts, :on_failure, :reject)
 
     {:ok, connection_agent} = Agent.start_link(fn -> connect_responses end)
 
@@ -448,7 +509,9 @@ defmodule BroadwayRabbitMQ.ProducerTest do
              connection_agent: connection_agent,
              qos: [prefetch_count: 10],
              requeue: requeue,
-             metadata: metadata},
+             metadata: metadata,
+             on_success: on_success,
+             on_failure: on_failure},
           stages: 1
         ]
       ],

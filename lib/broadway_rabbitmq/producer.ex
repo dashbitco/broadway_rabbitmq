@@ -52,6 +52,12 @@ defmodule BroadwayRabbitMQ.Producer do
       to `exchange_name` through `AMQP.Queue.bind/4` using `binding_options` as
       the options. Bindings are idempotent so you can bind the same queue to the
       same exchange multiple times.
+    * `:on_success` - configures the acking behaviour for successful messages.
+      See the "Acking" section below. Defaults to `:ack`. This option can also
+      be changed for each message through `Broadway.Message.configure_ack/2`.
+    * `:on_failure` - configures the acking behaviour for failed messages.
+      See the "Acking" section below. Defaults to `:reject`. This option can also
+      be changed for each message through `Broadway.Message.configure_ack/2`.
 
   > Note: choose the requeue strategy carefully. If you set the value to `:never`
   or `:once`, make sure you handle failed messages properly, either by logging
@@ -120,7 +126,10 @@ defmodule BroadwayRabbitMQ.Producer do
 
   ## Declaring queues and binding them to exchanges
 
-  In RabbitMQ, it's common for consumers to declare the queue they're going to consume from and bind it to the appropriate exchange when they start up. You can do these steps (either or both) when setting up your Broadway pipeline through the `:declare` and `:bindings` options.
+  In RabbitMQ, it's common for consumers to declare the queue they're going
+  to consume from and bind it to the appropriate exchange when they start up.
+  You can do these steps (either or both) when setting up your Broadway pipeline
+  through the `:declare` and `:bindings` options.
 
       Broadway.start_link(MyBroadway,
         name: MyBroadway,
@@ -139,6 +148,13 @@ defmodule BroadwayRabbitMQ.Producer do
         ]
       )
 
+  ## Acking
+
+  You can use the `:on_success` and `:on_failure` options to control how messages
+  are acked on RabbitMQ. By default, successful messages are acked and failed
+  messages are rejected. You can set `:on_success` and `:on_failure` when starting
+  the RabbitMQ producer, or change them for each message through
+  `Broadway.Message.configure_ack/2`.
   """
 
   use GenStage
@@ -156,6 +172,8 @@ defmodule BroadwayRabbitMQ.Producer do
     Process.flag(:trap_exit, true)
     client = opts[:client] || BroadwayRabbitMQ.AmqpClient
     {gen_stage_opts, opts} = Keyword.split(opts, [:buffer_size, :buffer_keep])
+    {success_failure_opts, opts} = Keyword.split(opts, [:on_success, :on_failure])
+    assert_valid_success_failure_opts!(success_failure_opts)
 
     case client.init(opts) do
       {:error, message} ->
@@ -176,8 +194,8 @@ defmodule BroadwayRabbitMQ.Producer do
            backoff: Backoff.new(opts),
            conn_ref: nil,
            channel_ref: nil,
-           on_success: :ack,
-           on_failure: :reject
+           on_success: Keyword.get(success_failure_opts, :on_success, :ack),
+           on_failure: Keyword.get(success_failure_opts, :on_failure, :reject)
          }, options}
     end
   end
@@ -252,24 +270,31 @@ defmodule BroadwayRabbitMQ.Producer do
 
   @impl Acknowledger
   def ack(_ack_ref = channel, successful, failed) do
-    ack_messages(successful, channel, :ack)
-    ack_messages(failed, channel, :reject)
+    ack_messages(successful, channel, :successful)
+    ack_messages(failed, channel, :failed)
   end
 
-  if {:configure, 3} in Broadway.Acknowledger.behaviour_info(:callbacks) do
-    @impl Acknowledger
-    def configure(ack_ref, ack_data, options) do
-      new_ack_data =
-        Map.new(options, fn
-          {:on_success, on_success} -> {:on_success, on_success}
-          {:on_failure, on_failure} -> {:on_failure, on_failure}
-          {other, _value} -> raise ArgumentError, "unsupported option #{inspect(other)}"
-        end)
+  @impl Acknowledger
+  def configure(_channel, ack_data, options) do
+    assert_valid_success_failure_opts!(options)
+    ack_data = Map.merge(ack_data, Map.new(options))
+    {:ok, ack_data}
+  end
 
-      ack_data = Map.merge(ack_data, new_ack_data)
+  defp assert_valid_success_failure_opts!(options) do
+    assert_supported_value = fn
+      value when value in [:ack, :reject] ->
+        :ok
 
-      {:ok, ack_data}
+      other ->
+        raise ArgumentError, "unsupported value for on_success/on_failure: #{inspect(other)}"
     end
+
+    Enum.each(options, fn
+      {:on_success, value} -> assert_supported_value.(value)
+      {:on_failure, value} -> assert_supported_value.(value)
+      {other, _value} -> raise ArgumentError, "unsupported configure option #{inspect(other)}"
+    end)
   end
 
   @impl Producer
@@ -302,12 +327,15 @@ defmodule BroadwayRabbitMQ.Producer do
     Keyword.put_new(opts, :buffer_size, prefetch_count * 5)
   end
 
-  defp ack_messages(messages, channel, ack_func) do
+  defp ack_messages(messages, channel, kind) do
     Enum.each(messages, fn msg ->
-      {_, _, ack_data} = msg.acknowledger
+      {_module, _channel, ack_data} = msg.acknowledger
 
       try do
-        apply_ack_func(ack_func, ack_data, channel)
+        case kind do
+          :successful -> apply_ack_func(ack_data.on_success, ack_data, channel)
+          :failed -> apply_ack_func(ack_data.on_failure, ack_data, channel)
+        end
       catch
         kind, reason ->
           Logger.error(Exception.format(kind, reason, System.stacktrace()))
