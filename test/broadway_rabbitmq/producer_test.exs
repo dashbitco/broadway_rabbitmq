@@ -274,25 +274,23 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
   end
 
-  describe "handle requeuing with :requeue option" do
-    test "always requeue messages with requeue == :always" do
-      {:ok, broadway} = start_broadway(requeue: :always)
+  describe "handle requeuing with the :on_success/:on_failure options" do
+    test "always requeue messages with :on_failure set to :reject_and_requeue" do
+      {:ok, broadway} = start_broadway(on_failure: :reject_and_requeue)
 
       deliver_messages(broadway, [1, :fail], redelivered: true)
       assert_receive {:reject, :fail, opts}
-      assert opts[:requeue] == true
 
       deliver_messages(broadway, [2, :fail], redelivered: false)
       assert_receive {:reject, :fail, opts}
-      assert opts[:requeue] == true
 
       refute_receive {:reject, :fail, _}
 
       stop_broadway(broadway)
     end
 
-    test "never requeue messages with requeue == :never" do
-      {:ok, broadway} = start_broadway(requeue: :never)
+    test "never requeue messages with :on_failure set to :reject" do
+      {:ok, broadway} = start_broadway(on_failure: :reject)
 
       deliver_messages(broadway, [1, :fail], redelivered: true)
       assert_receive {:reject, :fail, opts}
@@ -307,16 +305,14 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       stop_broadway(broadway)
     end
 
-    test "requeue messages unless it's been redelivered with requeue == :once" do
-      {:ok, broadway} = start_broadway(requeue: :once)
+    test "requeue messages unless it's been redelivered with :on_failure set to :reject_and_requeue_once" do
+      {:ok, broadway} = start_broadway(on_failure: :reject_and_requeue_once)
 
       deliver_messages(broadway, [1, :fail], redelivered: true)
       assert_receive {:reject, :fail, opts}
-      assert opts[:requeue] == false
 
       deliver_messages(broadway, [2, :fail], redelivered: false)
       assert_receive {:reject, :fail, opts}
-      assert opts[:requeue] == true
 
       refute_receive {:reject, :fail, _}
 
@@ -486,7 +482,6 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   defp start_broadway(opts \\ []) do
     connect_responses = Keyword.get(opts, :connect_responses, [])
     backoff_type = Keyword.get(opts, :backoff_type, :exp)
-    requeue = Keyword.get(opts, :requeue, :always)
     metadata = Keyword.get(opts, :metadata, [])
     on_success = Keyword.get(opts, :on_success, :ack)
     on_failure = Keyword.get(opts, :on_failure, :reject)
@@ -508,7 +503,6 @@ defmodule BroadwayRabbitMQ.ProducerTest do
              backoff_max: 100,
              connection_agent: connection_agent,
              qos: [prefetch_count: 10],
-             requeue: requeue,
              metadata: metadata,
              on_success: on_success,
              on_failure: on_failure},

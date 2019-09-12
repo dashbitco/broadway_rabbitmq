@@ -27,7 +27,8 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:buffer_keep` - Optional. Used in the GenStage producer configuration.
       Defines whether the `:first` or `:last` entries should be kept on the
       buffer in case the buffer size is exceeded. Defaults to `:last`.
-    * `:requeue` - Optional. Defines a strategy for requeuing failed messages.
+    * `:requeue` - *This option is deprecated*. Use `:on_success`/`:on_failure`
+      instead. Defines a strategy for requeuing failed messages.
       Possible values are: `:always` - always requeue, `:never` - never requeue,
       `:once` - requeue it once when the message was first delivered. Reject it
       without requeueing, if it's been redelivered. Default is `:always`.
@@ -76,7 +77,6 @@ defmodule BroadwayRabbitMQ.Producer do
             module:
               {BroadwayRabbitMQ.Producer,
               queue: "my_queue",
-              requeue: :once,
               connection: [
                 username: "user",
                 password: "password",
@@ -185,6 +185,16 @@ defmodule BroadwayRabbitMQ.Producer do
         prefetch_count = config[:qos][:prefetch_count]
         options = producer_options(gen_stage_opts, prefetch_count)
 
+        on_failure =
+          Keyword.get_lazy(success_failure_opts, :on_failure, fn ->
+            case config[:requeue] do
+              nil -> :reject_and_requeue
+              :always -> :reject_and_requeue
+              :once -> :reject_and_requeue_once
+              :never -> :reject
+            end
+          end)
+
         {:producer,
          %{
            client: client,
@@ -195,7 +205,7 @@ defmodule BroadwayRabbitMQ.Producer do
            conn_ref: nil,
            channel_ref: nil,
            on_success: Keyword.get(success_failure_opts, :on_success, :ack),
-           on_failure: Keyword.get(success_failure_opts, :on_failure, :reject)
+           on_failure: on_failure
          }, options}
     end
   end
@@ -227,7 +237,7 @@ defmodule BroadwayRabbitMQ.Producer do
     ack_data = %{
       delivery_tag: tag,
       client: client,
-      requeue: requeue?(config[:requeue], redelivered),
+      redelivered: redelivered,
       on_success: state.on_success,
       on_failure: state.on_failure
     }
@@ -283,7 +293,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
   defp assert_valid_success_failure_opts!(options) do
     assert_supported_value = fn
-      value when value in [:ack, :reject] ->
+      value when value in [:ack, :reject, :reject_and_requeue, :reject_and_requeue_once] ->
         :ok
 
       other ->
@@ -347,22 +357,15 @@ defmodule BroadwayRabbitMQ.Producer do
     ack_data.client.ack(channel, ack_data.delivery_tag)
   end
 
-  defp apply_ack_func(:reject, ack_data, channel) do
-    options = [requeue: ack_data.requeue]
+  defp apply_ack_func(reject, ack_data, channel)
+       when reject in [:reject, :reject_and_requeue, :reject_and_requeue_once] do
+    options = [requeue: requeue?(reject, ack_data.redelivered)]
     ack_data.client.reject(channel, ack_data.delivery_tag, options)
   end
 
-  defp requeue?(:once, redelivered) do
-    !redelivered
-  end
-
-  defp requeue?(:always, _) do
-    true
-  end
-
-  defp requeue?(:never, _) do
-    false
-  end
+  defp requeue?(:reject, _redelivered), do: false
+  defp requeue?(:reject_and_requeue, _redelivered), do: true
+  defp requeue?(:reject_and_requeue_once, redelivered), do: !redelivered
 
   defp connect(state) do
     %{client: client, config: config, backoff: backoff} = state

@@ -41,6 +41,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     with {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
          {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
          {:ok, queue} <- validate(opts, :queue),
+         maybe_warn_deprecated_requeue_opt(opts),
          {:ok, requeue} <- validate(opts, :requeue, @requeue_default_option),
          {:ok, conn_opts} <- validate_conn_opts(opts),
          {:ok, declare_opts} <- validate_declare_opts(opts, queue),
@@ -118,6 +119,13 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       Connection.close(conn)
     else
       :ok
+    end
+  end
+
+  # TODO: Remove when we remove support for :requeue.
+  defp maybe_warn_deprecated_requeue_opt(opts) do
+    if Keyword.has_key?(opts, :requeue) do
+      IO.warn("the :requeue option is deprecated, use :on_failure instead")
     end
   end
 
