@@ -14,7 +14,13 @@ defmodule BroadwayRabbitMQ.Producer do
       the queue through the `:declare` option.
     * `:connection` - Optional. Defines an AMQP URI or a set of options used by
       the RabbitMQ client to open the connection with the RabbitMQ broker. See
-      `AMQP.Connection.open/1` for the full list of options.
+      `AMQP.Connection.open/1` for the full list of options. Other than a string
+      (URI) or keyword list of options, this option can also be set to a function
+      that takes one argument. This function will be called with the index of
+      the producer in the Broadway topology and must return a URI or keyword
+      list of options that is then passed to `AMQP.Connection.open/1`. This
+      is useful to connect producers to different RabbitMQ nodes, for example
+      through partitioning.
     * `:qos` - Optional. Defines a set of prefetch options used by the RabbitMQ client.
       See `AMQP.Basic.qos/2` for the full list of options. Pay attention that the
       `:global` option is not supported by Broadway since each producer holds only one
