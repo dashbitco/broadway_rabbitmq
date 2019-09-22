@@ -72,6 +72,20 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
                AmqpClient.init(queue: "queue", connection: "http://example.com")
     end
 
+    test "providing a connection via a function that returns a URI" do
+      connection_fun = fn index -> "amqp://guest#{index}:guest@127.0.0.1" end
+
+      assert {:ok, %{connection: "amqp://guest1:guest@127.0.0.1"}} =
+               AmqpClient.init(queue: "queue", connection: connection_fun, broadway_index: 1)
+    end
+
+    test "providing a connection via a function that returns a keyword list of options" do
+      connection_fun = fn index -> [username: "guest#{index}"] end
+
+      assert {:ok, %{connection: [username: "guest4"]}} =
+               AmqpClient.init(queue: "queue", connection: connection_fun, broadway_index: 4)
+    end
+
     test "unsupported options for Broadway" do
       assert AmqpClient.init(queue: "queue", option_1: 1, option_2: 2) ==
                {:error, "Unsupported options [:option_1, :option_2] for \"Broadway\""}

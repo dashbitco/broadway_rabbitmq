@@ -23,7 +23,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :requeue,
     :metadata,
     :declare,
-    :bindings
+    :bindings,
+    :broadway_index
   ]
 
   @requeue_options [
@@ -158,9 +159,32 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   defp validate_conn_opts(opts) do
-    group = :connection
-    conn_opts = opts[group] || []
+    case opts[:connection] || [] do
+      fun when is_function(fun, 1) ->
+        index = Keyword.fetch!(opts, :broadway_index)
+        conn_opts = fun.(index)
 
+        if is_binary(conn_opts) or Keyword.keyword?(conn_opts) do
+          validate_conn_opts_no_function(conn_opts)
+        else
+          raise ArgumentError,
+                "if :connection is a function, it must return an URI or a keyword list, " <>
+                  "got: #{inspect(conn_opts)}"
+        end
+
+      other ->
+        validate_conn_opts_no_function(other)
+    end
+  end
+
+  defp validate_conn_opts_no_function(conn_uri) when is_binary(conn_uri) do
+    case conn_uri |> to_charlist() |> :amqp_uri.parse() do
+      {:ok, _amqp_params} -> {:ok, conn_uri}
+      {:error, reason} -> {:error, "Failed parsing AMQP URI: #{inspect(reason)}"}
+    end
+  end
+
+  defp validate_conn_opts_no_function(opts) when is_list(opts) do
     supported = [
       :username,
       :password,
@@ -176,7 +200,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       :socket_options
     ]
 
-    validate_supported_opts(conn_opts, group, supported)
+    validate_supported_opts(opts, _group = :connection, supported)
   end
 
   defp validate_declare_opts(opts, queue) do
@@ -221,10 +245,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   defp validate_supported_opts(uri, :connection, _) when is_binary(uri) do
-    case uri |> to_charlist |> :amqp_uri.parse() do
-      {:ok, _amqp_params} -> {:ok, uri}
-      {:error, reason} -> {:error, "Failed parsing AMQP URI: #{inspect(reason)}"}
-    end
   end
 
   defp validate_supported_opts(opts, group_name, supported_opts) do
