@@ -14,13 +14,7 @@ defmodule BroadwayRabbitMQ.Producer do
       the queue through the `:declare` option.
     * `:connection` - Optional. Defines an AMQP URI or a set of options used by
       the RabbitMQ client to open the connection with the RabbitMQ broker. See
-      `AMQP.Connection.open/1` for the full list of options. Other than a string
-      (URI) or keyword list of options, this option can also be set to a function
-      that takes one argument. This function will be called with the index of
-      the producer in the Broadway topology and must return a URI or keyword
-      list of options that is then passed to `AMQP.Connection.open/1`. This
-      is useful to connect producers to different RabbitMQ nodes, for example
-      through partitioning.
+      `AMQP.Connection.open/1` for the full list of options.
     * `:qos` - Optional. Defines a set of prefetch options used by the RabbitMQ client.
       See `AMQP.Basic.qos/2` for the full list of options. Pay attention that the
       `:global` option is not supported by Broadway since each producer holds only one
@@ -62,6 +56,13 @@ defmodule BroadwayRabbitMQ.Producer do
       See the "Acking" section below for all the possible values. Defaults to
       `:reject_and_requeue`. This option can also be changed for each message through
       `Broadway.Message.configure_ack/2`.
+    * `:merge_options` - a function that takes the index of the producer in the
+      Broadway topology and returns a keyword list of options. The returned options
+      are merged with the other options given to the producer. This option is useful
+      to dynamically change options based on the index of the producer. For example,
+      you can use this option to "shard" load between a few queues where a subset of
+      the producer stages is connected to each queue, or to connect producers to
+      different RabbitMQ nodes (for example through partitioning).
 
   > Note: choose the requeue strategy carefully. If you set the value to `:never`
   or `:once`, make sure you handle failed messages properly, either by logging
