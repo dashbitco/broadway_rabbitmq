@@ -24,7 +24,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :metadata,
     :declare,
     :bindings,
-    :broadway_index
+    :broadway_index,
+    :merge_options
   ]
 
   @requeue_options [
@@ -39,7 +40,9 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   @impl true
   def init(opts) do
-    with {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
+    with {:ok, merge_opts} <- validate_merge_opts(opts),
+         opts = Keyword.merge(opts, merge_opts),
+         {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
          {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
          {:ok, queue} <- validate(opts, :queue),
          maybe_warn_deprecated_requeue_opt(opts),
@@ -130,12 +133,39 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
+  defp validate_merge_opts(opts) do
+    case Keyword.fetch(opts, :merge_options) do
+      {:ok, fun} when is_function(fun, 1) ->
+        index = Keyword.fetch!(opts, :broadway_index)
+        merge_opts = fun.(index)
+
+        if Keyword.keyword?(merge_opts) do
+          {:ok, merge_opts}
+        else
+          message =
+            "The :merge_options function should return a keyword list, " <>
+              "got: #{inspect(merge_opts)}"
+
+          {:error, message}
+        end
+
+      {:ok, other} ->
+        {:error, ":merge_options must be a function with arity 1, got: #{inspect(other)}"}
+
+      :error ->
+        {:ok, _merge_opts = []}
+    end
+  end
+
   defp validate(opts, key, default \\ nil) when is_list(opts) do
     validate_option(key, opts[key] || default)
   end
 
   defp validate_option(:queue, value) when not is_binary(value),
     do: validation_error(:queue, "a string", value)
+
+  defp validate_option(:connection, value) when not (is_binary(value) or is_list(value)),
+    do: validation_error(:connection, "a URI or a keyword list", value)
 
   defp validate_option(:requeue, value) when value not in @requeue_options,
     do: validation_error(:queue, "any of #{inspect(@requeue_options)}", value)
@@ -159,48 +189,31 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   defp validate_conn_opts(opts) do
-    case opts[:connection] || [] do
-      fun when is_function(fun, 1) ->
-        index = Keyword.fetch!(opts, :broadway_index)
-        conn_opts = fun.(index)
-
-        if is_binary(conn_opts) or Keyword.keyword?(conn_opts) do
-          validate_conn_opts_no_function(conn_opts)
-        else
-          raise ArgumentError,
-                "if :connection is a function, it must return an URI or a keyword list, " <>
-                  "got: #{inspect(conn_opts)}"
+    case Keyword.get(opts, :connection, []) do
+      uri when is_binary(uri) ->
+        case uri |> to_charlist() |> :amqp_uri.parse() do
+          {:ok, _amqp_params} -> {:ok, uri}
+          {:error, reason} -> {:error, "Failed parsing AMQP URI: #{inspect(reason)}"}
         end
 
-      other ->
-        validate_conn_opts_no_function(other)
+      opts when is_list(opts) ->
+        supported = [
+          :username,
+          :password,
+          :virtual_host,
+          :host,
+          :port,
+          :channel_max,
+          :frame_max,
+          :heartbeat,
+          :connection_timeout,
+          :ssl_options,
+          :client_properties,
+          :socket_options
+        ]
+
+        validate_supported_opts(opts, _group = :connection, supported)
     end
-  end
-
-  defp validate_conn_opts_no_function(conn_uri) when is_binary(conn_uri) do
-    case conn_uri |> to_charlist() |> :amqp_uri.parse() do
-      {:ok, _amqp_params} -> {:ok, conn_uri}
-      {:error, reason} -> {:error, "Failed parsing AMQP URI: #{inspect(reason)}"}
-    end
-  end
-
-  defp validate_conn_opts_no_function(opts) when is_list(opts) do
-    supported = [
-      :username,
-      :password,
-      :virtual_host,
-      :host,
-      :port,
-      :channel_max,
-      :frame_max,
-      :heartbeat,
-      :connection_timeout,
-      :ssl_options,
-      :client_properties,
-      :socket_options
-    ]
-
-    validate_supported_opts(opts, _group = :connection, supported)
   end
 
   defp validate_declare_opts(opts, queue) do
@@ -242,9 +255,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     qos_opts
     |> Keyword.put_new(:prefetch_count, @default_prefetch_count)
     |> validate_supported_opts(group, supported)
-  end
-
-  defp validate_supported_opts(uri, :connection, _) when is_binary(uri) do
   end
 
   defp validate_supported_opts(opts, group_name, supported_opts) do
