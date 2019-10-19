@@ -176,6 +176,12 @@ defmodule BroadwayRabbitMQ.Producer do
       the first time. If a message was already requeued and redelivered, it will be
       rejected and not requeued again.
 
+    * `{module, function, arguments}` - a function to be called when handling the
+      success/failed message. This function must return one of the other possible
+      values, such as `:ack` if you want to ultimately ack the message. `arguments`
+      is a list of arguments. The success/failed message is *prependend* to the
+      list of arguments as the first argument before calling `function`.
+
   """
 
   use GenStage
@@ -317,6 +323,9 @@ defmodule BroadwayRabbitMQ.Producer do
       value when value in [:ack, :reject, :reject_and_requeue, :reject_and_requeue_once] ->
         :ok
 
+      {mod, fun, args} when is_atom(mod) and is_atom(fun) and is_list(args) ->
+        :ok
+
       other ->
         raise ArgumentError, "unsupported value for on_success/on_failure: #{inspect(other)}"
     end
@@ -364,8 +373,8 @@ defmodule BroadwayRabbitMQ.Producer do
 
       try do
         case kind do
-          :successful -> apply_ack_func(ack_data.on_success, ack_data, channel)
-          :failed -> apply_ack_func(ack_data.on_failure, ack_data, channel)
+          :successful -> apply_ack_func(ack_data.on_success, msg, ack_data, channel)
+          :failed -> apply_ack_func(ack_data.on_failure, msg, ack_data, channel)
         end
       catch
         kind, reason ->
@@ -374,14 +383,27 @@ defmodule BroadwayRabbitMQ.Producer do
     end)
   end
 
-  defp apply_ack_func(:ack, ack_data, channel) do
+  defp apply_ack_func(:ack, _message, ack_data, channel) do
     ack_data.client.ack(channel, ack_data.delivery_tag)
   end
 
-  defp apply_ack_func(reject, ack_data, channel)
+  defp apply_ack_func(reject, _message, ack_data, channel)
        when reject in [:reject, :reject_and_requeue, :reject_and_requeue_once] do
     options = [requeue: requeue?(reject, ack_data.redelivered)]
     ack_data.client.reject(channel, ack_data.delivery_tag, options)
+  end
+
+  defp apply_ack_func({mod, fun, args}, message, ack_data, channel) do
+    case apply(mod, fun, [message | args]) do
+      result when result in [:ack, :reject, :reject_and_requeue, :reject_and_requeue_once] ->
+        apply_ack_func(result, message, ack_data, channel)
+
+      other ->
+        raise ArgumentError,
+              "the function passed to :on_success/:on_failure should return " <>
+                "a valid action (:ack, :reject, :reject_and_requeue, or " <>
+                ":reject_and_requeue_once), got: #{inspect(other)}"
+    end
   end
 
   defp requeue?(:reject, _redelivered), do: false

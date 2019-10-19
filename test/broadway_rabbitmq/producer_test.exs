@@ -318,6 +318,32 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
       stop_broadway(broadway)
     end
+
+    test "support {mod, fun, args} in :on_success and :on_failure" do
+      defmodule Handler do
+        def success(message, pid) do
+          send(pid, {:success_called, message})
+          :ack
+        end
+
+        def fail(message, pid) do
+          send(pid, {:fail_called, message})
+          :reject
+        end
+      end
+
+      on_success = {Handler, :success, [self()]}
+      on_failure = {Handler, :fail, [self()]}
+      {:ok, broadway} = start_broadway(on_success: on_success, on_failure: on_failure)
+
+      deliver_messages(broadway, [1, :fail])
+
+      assert_receive {:success_called, %Broadway.Message{data: 1}}
+      assert_receive {:ack, 1}
+
+      assert_receive {:fail_called, %Broadway.Message{data: :fail}}
+      assert_receive {:reject, :fail, _opts}
+    end
   end
 
   describe "prepare_for_draining" do
