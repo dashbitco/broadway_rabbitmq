@@ -491,23 +491,21 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     Broadway.start_link(Forwarder,
       name: new_unique_name(),
       context: %{test_pid: self()},
-      producers: [
-        default: [
-          module:
-            {BroadwayRabbitMQ.Producer,
-             client: FakeRabbitmqClient,
-             queue: "test",
-             test_pid: self(),
-             backoff_type: backoff_type,
-             backoff_min: 10,
-             backoff_max: 100,
-             connection_agent: connection_agent,
-             qos: [prefetch_count: 10],
-             metadata: metadata,
-             on_success: on_success,
-             on_failure: on_failure},
-          stages: 1
-        ]
+      producer: [
+        module:
+          {BroadwayRabbitMQ.Producer,
+           client: FakeRabbitmqClient,
+           queue: "test",
+           test_pid: self(),
+           backoff_type: backoff_type,
+           backoff_min: 10,
+           backoff_max: 100,
+           connection_agent: connection_agent,
+           qos: [prefetch_count: 10],
+           metadata: metadata,
+           on_success: on_success,
+           on_failure: on_failure},
+        stages: 1
       ],
       processors: [
         default: [stages: 1]
@@ -528,7 +526,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   defp deliver_messages(broadway, messages, opts \\ []) do
     redelivered = Keyword.get(opts, :redelivered, false)
-    producer = Broadway.Server.get_random_producer(broadway)
+    producer = Broadway.producer_names(broadway) |> Enum.random()
     extra_metadata = Keyword.get(opts, :extra_metadata, %{})
 
     Enum.each(messages, fn msg ->
@@ -540,9 +538,9 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end)
   end
 
-  defp get_producer(broadway, key \\ :default, index \\ 1) do
+  defp get_producer(broadway, index \\ 0) do
     name = Process.info(broadway)[:registered_name]
-    :"#{name}.Broadway.Producer_#{key}_#{index}"
+    :"#{name}.Broadway.Producer_#{index}"
   end
 
   defp get_backoff_timeout(broadway) do

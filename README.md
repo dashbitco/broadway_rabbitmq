@@ -29,13 +29,11 @@ Configure Broadway with one or more producers using `BroadwayRabbitMQ.Producer`:
     def start_link(_opts) do
       Broadway.start_link(__MODULE__,
         name: __MODULE__,
-        producers: [
-          default: [
-            module: {BroadwayRabbitMQ.Producer,
-              queue: "my_queue",
-            },
-            stages: 2
-          ]
+        producer: [
+          module: {BroadwayRabbitMQ.Producer,
+            queue: "my_queue",
+          },
+          stages: 2
         ],
         processors: [
           default: [

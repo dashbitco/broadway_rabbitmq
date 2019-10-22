@@ -24,7 +24,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :metadata,
     :declare,
     :bindings,
-    :broadway_index,
+    :broadway,
     :merge_options
   ]
 
@@ -136,7 +136,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   defp validate_merge_opts(opts) do
     case Keyword.fetch(opts, :merge_options) do
       {:ok, fun} when is_function(fun, 1) ->
-        index = Keyword.fetch!(opts, :broadway_index)
+        index = opts[:broadway][:index] || raise "missing broadway index"
         merge_opts = fun.(index)
 
         if Keyword.keyword?(merge_opts) do

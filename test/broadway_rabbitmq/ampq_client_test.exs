@@ -156,7 +156,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
       assert {:ok, %{queue: "queue4"}} =
                AmqpClient.init(
                  queue: "queue",
-                 broadway_index: 4,
+                 broadway: [index: 4],
                  merge_options: merge_options_fun
                )
     end
@@ -169,7 +169,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
       assert {:ok, %{connection: connection}} =
                AmqpClient.init(
                  queue: "queue",
-                 broadway_index: 4,
+                 broadway: [index: 4],
                  connection: [host: "example.com"],
                  merge_options: merge_options_fun
                )
@@ -185,7 +185,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     test ":merge_options should return a keyword list" do
       assert AmqpClient.init(
                queue: "queue",
-               broadway_index: 4,
+               broadway: [index: 4],
                merge_options: fn _index -> :ok end
              ) ==
                {:error, "The :merge_options function should return a keyword list, got: :ok"}
@@ -194,7 +194,11 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     test "options returned by :merge_options are still validated" do
       merge_options_fun = fn _index -> [option: 1] end
 
-      assert AmqpClient.init(queue: "queue", merge_options: merge_options_fun, broadway_index: 4) ==
+      assert AmqpClient.init(
+               queue: "queue",
+               merge_options: merge_options_fun,
+               broadway: [index: 4]
+             ) ==
                {:error, "Unsupported options [:option] for \"Broadway\""}
     end
   end

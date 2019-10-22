@@ -76,21 +76,19 @@ defmodule BroadwayRabbitMQ.Producer do
 
       Broadway.start_link(MyBroadway,
         name: MyBroadway,
-        producers: [
-          default: [
-            module:
-              {BroadwayRabbitMQ.Producer,
-              queue: "my_queue",
-              connection: [
-                username: "user",
-                password: "password",
-                host: "192.168.0.10"
-              ],
-              qos: [
-                prefetch_count: 50
-              ]},
-            stages: 5
-          ]
+        producer: [
+          module:
+            {BroadwayRabbitMQ.Producer,
+            queue: "my_queue",
+            connection: [
+              username: "user",
+              password: "password",
+              host: "192.168.0.10"
+            ],
+            qos: [
+              prefetch_count: 50
+            ]},
+          stages: 5
         ],
         processors: [
           default: []
@@ -137,15 +135,13 @@ defmodule BroadwayRabbitMQ.Producer do
 
       Broadway.start_link(MyBroadway,
         name: MyBroadway,
-        producers: [
-          default: [
-            module:
-              {BroadwayRabbitMQ.Producer,
-              queue: "my_queue",
-              declare: [],
-              bindings: [{"my-exchange", []}]},
-            stages: 5
-          ]
+        producer: [
+          module:
+            {BroadwayRabbitMQ.Producer,
+            queue: "my_queue",
+            declare: [],
+            bindings: [{"my-exchange", []}]},
+          stages: 5
         ],
         processors: [
           default: []
