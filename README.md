@@ -29,7 +29,7 @@ Configure Broadway with one or more producers using `BroadwayRabbitMQ.Producer`:
     def start_link(_opts) do
       Broadway.start_link(__MODULE__,
         name: __MODULE__,
-        producer: [
+        producers: [
           module: {BroadwayRabbitMQ.Producer,
             queue: "my_queue",
           },
