@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.5.0 (2019-11-04)
+
+  * Add support for configuring acking behaviour using `:on_success` and `:on_failure` options
+  * Add support for declare options `:no_wait` and `:arguments`
+  * Handle `:auth_failure`, `:unknown_host` and `:socket_closed_unexpectedly` errors
+  * Add support for a function as the `:connection`
+  * Add support for `:merge_options` option
+  * Update to Broadway v0.5.0
+
 ## v0.4.0 (2019-08-06)
 
   * Add `:declare` and `:bindings` options to producers

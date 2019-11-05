@@ -1,14 +1,14 @@
 defmodule BroadwayRabbitMQ.MixProject do
   use Mix.Project
 
-  @version "0.4.0"
+  @version "0.5.0"
   @description "A RabbitMQ connector for Broadway"
 
   def project do
     [
       app: :broadway_rabbitmq,
       version: @version,
-      elixir: "~> 1.5",
+      elixir: "~> 1.7",
       name: "BroadwayRabbitMQ",
       description: @description,
       start_permanent: Mix.env() == :prod,
@@ -26,8 +26,8 @@ defmodule BroadwayRabbitMQ.MixProject do
 
   defp deps do
     [
-      {:broadway, github: "plataformatec/broadway"},
-      {:amqp, "~> 1.1"},
+      {:broadway, "~> 0.5.0"},
+      {:amqp, "~> 1.3"},
       {:ex_doc, ">= 0.19.0", only: :docs}
     ]
   end

@@ -13,7 +13,7 @@ Add `:broadway_rabbitmq` to the list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:broadway_rabbitmq, "~> 0.4.0"}
+    {:broadway_rabbitmq, "~> 0.5.0"}
   ]
 end
 ```
