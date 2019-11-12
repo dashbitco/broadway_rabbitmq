@@ -321,23 +321,25 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   describe "prepare_for_draining" do
-    test "cancel consumer" do
+    test "cancel consumer and keep the current state" do
       channel = FakeChannel.new(self())
       tag = :fake_consumer_tag
       state = %{client: FakeRabbitmqClient, channel: channel, consumer_tag: tag}
 
-      assert BroadwayRabbitMQ.Producer.prepare_for_draining(state) == :ok
+      assert {:noreply, [], ^state} = BroadwayRabbitMQ.Producer.prepare_for_draining(state)
       assert_received {:cancel, ^tag}
     end
 
-    test "log unsuccessful cancellation" do
+    test "log unsuccessful cancellation and keep the current state" do
       channel = FakeChannel.new(self())
       tag = :fake_consumer_tag_closing
       state = %{client: FakeRabbitmqClient, channel: channel, consumer_tag: tag}
 
-      assert capture_log(fn ->
-               assert BroadwayRabbitMQ.Producer.prepare_for_draining(state) == :ok
-             end) =~ "[error] Could not cancel producer while draining. Channel is closing"
+      assert(
+        capture_log(fn ->
+          assert {:noreply, [], ^state} = BroadwayRabbitMQ.Producer.prepare_for_draining(state)
+        end)
+      ) =~ "[error] Could not cancel producer while draining. Channel is closing"
     end
   end
 

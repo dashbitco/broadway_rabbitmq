@@ -325,8 +325,8 @@ defmodule BroadwayRabbitMQ.Producer do
   end
 
   @impl Producer
-  def prepare_for_draining(%{channel: nil}) do
-    :ok
+  def prepare_for_draining(%{channel: nil} = state) do
+    {:noreply, [], state}
   end
 
   def prepare_for_draining(state) do
@@ -334,11 +334,11 @@ defmodule BroadwayRabbitMQ.Producer do
 
     case client.cancel(channel, consumer_tag) do
       {:ok, ^consumer_tag} ->
-        :ok
+        {:noreply, [], state}
 
       {:error, error} ->
         Logger.error("Could not cancel producer while draining. Channel is #{error}")
-        :ok
+        {:noreply, [], state}
     end
   end
 
