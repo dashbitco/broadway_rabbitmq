@@ -26,7 +26,7 @@ defmodule BroadwayRabbitMQ.MixProject do
 
   defp deps do
     [
-      {:broadway, git: "https://github.com/plataformatec/broadway.git"},
+      {:broadway, git: "https://github.com/dashbitco/broadway.git"},
       {:amqp, "~> 1.3"},
       {:ex_doc, ">= 0.19.0", only: :docs}
     ]
@@ -36,14 +36,14 @@ defmodule BroadwayRabbitMQ.MixProject do
     [
       main: "BroadwayRabbitMQ.Producer",
       source_ref: "v#{@version}",
-      source_url: "https://github.com/plataformatec/broadway_rabbitmq"
+      source_url: "https://github.com/dashbitco/broadway_rabbitmq"
     ]
   end
 
   defp package do
     %{
       licenses: ["Apache 2.0"],
-      links: %{"GitHub" => "https://github.com/plataformatec/broadway_rabbitmq"}
+      links: %{"GitHub" => "https://github.com/dashbitco/broadway_rabbitmq"}
     }
   end
 end

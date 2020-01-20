@@ -1,6 +1,6 @@
 # BroadwayRabbitMQ
 
-A RabbitMQ connector for [Broadway](https://github.com/plataformatec/broadway).
+A RabbitMQ connector for [Broadway](https://github.com/dashbitco/broadway).
 
 Documentation can be found at [https://hexdocs.pm/broadway_rabbitmq](https://hexdocs.pm/broadway_rabbitmq).
 For more details on using Broadway with RabbitMQ, please see the
@@ -53,6 +53,7 @@ Configure Broadway with one or more producers using `BroadwayRabbitMQ.Producer`:
 ## License
 
 Copyright 2019 Plataformatec
+Copyright 2020 Dashbit
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
