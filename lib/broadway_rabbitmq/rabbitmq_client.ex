@@ -9,7 +9,7 @@ defmodule BroadwayRabbitMQ.RabbitmqClient do
            metadata: list(atom())
          }
 
-  @callback init(opts :: any) :: {:ok, queue_name :: String.t(), config} | {:error, any}
+  @callback init(opts :: any) :: {:ok, config} | {:error, any}
   @callback setup_channel(config) :: {:ok, Channel.t()} | {:error, any}
   @callback ack(channel :: Channel.t(), delivery_tag :: Basic.delivery_tag()) :: any
   @callback reject(channel :: Channel.t(), delivery_tag :: Basic.delivery_tag(), opts :: keyword) ::
