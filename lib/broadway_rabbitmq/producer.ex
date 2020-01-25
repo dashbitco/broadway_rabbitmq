@@ -62,7 +62,13 @@ defmodule BroadwayRabbitMQ.Producer do
       to dynamically change options based on the index of the producer. For example,
       you can use this option to "shard" load between a few queues where a subset of
       the producer stages is connected to each queue, or to connect producers to
-      different RabbitMQ nodes (for example through partitioning).
+      different RabbitMQ nodes (for example through partitioning). Note that the options
+      are evaluated every time a connection is established (for example, in case
+      of disconnections). This means that you can also use this option to choose
+      different options on every reconnections. This can be particularly useful
+      if you have multiple RabbitMQ URLs: in that case, you can reconnect to a different
+      URL every time you reconnect to RabbitMQ, which avoids the case where the
+      producer tries to always reconnect to a URL that is down.
 
   > Note: choose the requeue strategy carefully. If you set the value to `:never`
   or `:once`, make sure you handle failed messages properly, either by logging
@@ -189,42 +195,30 @@ defmodule BroadwayRabbitMQ.Producer do
     Process.flag(:trap_exit, true)
     client = opts[:client] || BroadwayRabbitMQ.AmqpClient
     {gen_stage_opts, opts} = Keyword.split(opts, [:buffer_size, :buffer_keep])
-    {success_failure_opts, opts} = Keyword.split(opts, [:on_success, :on_failure])
+    {success_failure_opts, opts} = split_success_failure_options(opts)
+
     assert_valid_success_failure_opts!(success_failure_opts)
 
-    case client.init(opts) do
-      {:error, message} ->
-        raise ArgumentError, "invalid options given to #{inspect(client)}.init/1, " <> message
+    config = init_client!(client, opts)
 
-      {:ok, config} ->
-        send(self(), :connect)
+    send(self(), {:connect, :no_init_client})
 
-        prefetch_count = config[:qos][:prefetch_count]
-        options = producer_options(gen_stage_opts, prefetch_count)
+    prefetch_count = config[:qos][:prefetch_count]
+    options = producer_options(gen_stage_opts, prefetch_count)
 
-        on_failure =
-          Keyword.get_lazy(success_failure_opts, :on_failure, fn ->
-            case config[:requeue] do
-              nil -> :reject_and_requeue
-              :always -> :reject_and_requeue
-              :once -> :reject_and_requeue_once
-              :never -> :reject
-            end
-          end)
-
-        {:producer,
-         %{
-           client: client,
-           channel: nil,
-           consumer_tag: nil,
-           config: config,
-           backoff: Backoff.new(opts),
-           conn_ref: nil,
-           channel_ref: nil,
-           on_success: Keyword.get(success_failure_opts, :on_success, :ack),
-           on_failure: on_failure
-         }, options}
-    end
+    {:producer,
+     %{
+       client: client,
+       channel: nil,
+       consumer_tag: nil,
+       config: config,
+       backoff: Backoff.new(opts),
+       conn_ref: nil,
+       channel_ref: nil,
+       opts: opts,
+       on_success: Keyword.fetch!(success_failure_opts, :on_success),
+       on_failure: Keyword.fetch!(success_failure_opts, :on_failure)
+     }, options}
   end
 
   @impl true
@@ -240,7 +234,7 @@ defmodule BroadwayRabbitMQ.Producer do
   # RabbitMQ sends this in a few scenarios, like if the queue this consumer
   # is consuming from gets deleted. See https://www.rabbitmq.com/consumer-cancel.html.
   def handle_info({:basic_cancel, _}, state) do
-    {:noreply, [], connect(state)}
+    {:noreply, [], connect(state, :init_client)}
   end
 
   def handle_info({:basic_cancel_ok, _}, state) do
@@ -269,15 +263,15 @@ defmodule BroadwayRabbitMQ.Producer do
   end
 
   def handle_info({:DOWN, ref, :process, _pid, _reason}, %{conn_ref: ref} = state) do
-    {:noreply, [], connect(state)}
+    {:noreply, [], connect(state, :init_client)}
   end
 
   def handle_info({:DOWN, ref, :process, _pid, _reason}, %{channel_ref: ref} = state) do
-    {:noreply, [], connect(state)}
+    {:noreply, [], connect(state, :init_client)}
   end
 
-  def handle_info(:connect, state) do
-    {:noreply, [], connect(state)}
+  def handle_info({:connect, mode}, state) when mode in [:init_client, :no_init_client] do
+    {:noreply, [], connect(state, mode)}
   end
 
   def handle_info(_, state) do
@@ -384,8 +378,16 @@ defmodule BroadwayRabbitMQ.Producer do
   defp requeue?(:reject_and_requeue, _redelivered), do: true
   defp requeue?(:reject_and_requeue_once, redelivered), do: !redelivered
 
-  defp connect(state) do
-    %{client: client, config: config, backoff: backoff} = state
+  defp connect(state, mode) when mode in [:init_client, :no_init_client] do
+    %{client: client, config: config, backoff: backoff, opts: opts} = state
+
+    config =
+      if mode == :no_init_client do
+        config
+      else
+        init_client!(client, opts)
+      end
+
     # TODO: Treat other setup errors properly
     case client.setup_channel(config) do
       {:ok, channel} ->
@@ -397,6 +399,7 @@ defmodule BroadwayRabbitMQ.Producer do
         %{
           state
           | channel: channel,
+            config: config,
             consumer_tag: consumer_tag,
             backoff: backoff,
             conn_ref: conn_ref,
@@ -423,7 +426,7 @@ defmodule BroadwayRabbitMQ.Producer do
     new_backoff =
       if backoff do
         {timeout, backoff} = Backoff.backoff(backoff)
-        Process.send_after(self(), :connect, timeout)
+        Process.send_after(self(), {:connect, :init_client}, timeout)
         backoff
       end
 
@@ -435,5 +438,42 @@ defmodule BroadwayRabbitMQ.Producer do
         conn_ref: nil,
         channel_ref: nil
     }
+  end
+
+  defp init_client!(client, opts) do
+    case client.init(opts) do
+      {:ok, config} ->
+        config
+
+      {:error, message} ->
+        raise ArgumentError, "invalid options given to #{inspect(client)}.init/1, " <> message
+    end
+  end
+
+  defp split_success_failure_options(opts) do
+    {success_failure_opts, opts} = Keyword.split(opts, [:on_success, :on_failure])
+    {requeue, opts} = Keyword.pop(opts, :requeue)
+
+    # TODO: Remove when we remove support for :requeue.
+    if requeue do
+      IO.warn("the :requeue option is deprecated, use :on_failure instead")
+    end
+
+    on_failure =
+      Keyword.get_lazy(success_failure_opts, :on_failure, fn ->
+        case requeue do
+          nil -> :reject_and_requeue
+          :always -> :reject_and_requeue
+          :once -> :reject_and_requeue_once
+          :never -> :reject
+        end
+      end)
+
+    success_failure_opts = [
+      on_success: Keyword.get(success_failure_opts, :on_success, :ack),
+      on_failure: on_failure
+    ]
+
+    {success_failure_opts, opts}
   end
 end

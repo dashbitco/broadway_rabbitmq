@@ -9,7 +9,6 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
               %{
                 connection: [],
                 qos: [prefetch_count: 50],
-                requeue: :always,
                 metadata: [],
                 bindings: [],
                 declare_opts: nil,
@@ -52,7 +51,6 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
                 %{
                   connection: connection,
                   qos: qos,
-                  requeue: :always,
                   metadata: metadata,
                   bindings: [],
                   declare_opts: nil,
@@ -114,22 +112,6 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
       assert {:ok, config} = AmqpClient.init(queue: "", declare: [])
       assert config.queue == ""
-    end
-
-    # TODO: remove this test once we remove support for :requeue.
-    test ":requeue should be :never, :always or :once" do
-      ExUnit.CaptureIO.capture_io(:stderr, fn ->
-        {:ok, opts} = AmqpClient.init(queue: "queue", requeue: :never)
-        assert opts[:requeue] == :never
-        {:ok, opts} = AmqpClient.init(queue: "queue", requeue: :always)
-        assert opts[:requeue] == :always
-        {:ok, opts} = AmqpClient.init(queue: "queue", requeue: :once)
-        assert opts[:requeue] == :once
-        {:error, reason} = AmqpClient.init(queue: "queue", requeue: :unsupported)
-
-        assert reason ==
-                 "expected :queue to be any of [:never, :always, :once], got: :unsupported"
-      end)
     end
 
     test ":metadata should be a list of atoms" do
