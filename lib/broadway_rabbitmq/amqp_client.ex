@@ -20,7 +20,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :backoff_min,
     :backoff_max,
     :backoff_type,
-    :requeue,
     :metadata,
     :declare,
     :bindings,
@@ -28,15 +27,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :merge_options
   ]
 
-  @requeue_options [
-    :never,
-    :always,
-    :once
-  ]
-
   @default_metadata []
-
-  @requeue_default_option :always
 
   @impl true
   def init(opts) do
@@ -45,8 +36,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
          {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
          {:ok, queue} <- validate(opts, :queue),
-         maybe_warn_deprecated_requeue_opt(opts),
-         {:ok, requeue} <- validate(opts, :requeue, @requeue_default_option),
          {:ok, conn_opts} <- validate_conn_opts(opts),
          {:ok, declare_opts} <- validate_declare_opts(opts, queue),
          {:ok, bindings} <- validate_bindings(opts),
@@ -58,7 +47,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          declare_opts: declare_opts,
          bindings: bindings,
          qos: qos_opts,
-         requeue: requeue,
          metadata: metadata
        }}
     end
@@ -126,13 +114,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  # TODO: Remove when we remove support for :requeue.
-  defp maybe_warn_deprecated_requeue_opt(opts) do
-    if Keyword.has_key?(opts, :requeue) do
-      IO.warn("the :requeue option is deprecated, use :on_failure instead")
-    end
-  end
-
   defp validate_merge_opts(opts) do
     case Keyword.fetch(opts, :merge_options) do
       {:ok, fun} when is_function(fun, 1) ->
@@ -166,9 +147,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   defp validate_option(:connection, value) when not (is_binary(value) or is_list(value)),
     do: validation_error(:connection, "a URI or a keyword list", value)
-
-  defp validate_option(:requeue, value) when value not in @requeue_options,
-    do: validation_error(:queue, "any of #{inspect(@requeue_options)}", value)
 
   defp validate_option(:metadata, value) when is_list(value) do
     if Enum.all?(value, &is_atom/1),

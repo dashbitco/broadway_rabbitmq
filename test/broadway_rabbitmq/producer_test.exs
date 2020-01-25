@@ -33,6 +33,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     @impl true
     def init(opts) do
+      send(opts[:test_pid], :init_called)
       {:ok, opts}
     end
 
@@ -403,6 +404,19 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
       stop_broadway(broadway)
     end
+
+    test "client is reinitialized every time it reconnects (for example, for switching URLs)" do
+      {:ok, broadway} = start_broadway()
+
+      assert_receive {:setup_channel, :ok, _}
+      assert_receive :init_called
+
+      deliver_messages(broadway, [1, :break_conn])
+      assert_receive {:setup_channel, :ok, _}
+      assert_receive :init_called
+
+      stop_broadway(broadway)
+    end
   end
 
   describe "handle consumer cancellation" do
@@ -487,6 +501,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     metadata = Keyword.get(opts, :metadata, [])
     on_success = Keyword.get(opts, :on_success, :ack)
     on_failure = Keyword.get(opts, :on_failure, :reject)
+    merge_options = Keyword.get(opts, :merge_options, fn _ -> [] end)
 
     {:ok, connection_agent} = Agent.start_link(fn -> connect_responses end)
 
@@ -506,7 +521,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
            qos: [prefetch_count: 10],
            metadata: metadata,
            on_success: on_success,
-           on_failure: on_failure},
+           on_failure: on_failure,
+           merge_options: merge_options},
         stages: 1
       ],
       processors: [
