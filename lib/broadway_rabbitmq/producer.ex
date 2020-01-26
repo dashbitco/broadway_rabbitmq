@@ -195,9 +195,11 @@ defmodule BroadwayRabbitMQ.Producer do
     Process.flag(:trap_exit, true)
     client = opts[:client] || BroadwayRabbitMQ.AmqpClient
     {gen_stage_opts, opts} = Keyword.split(opts, [:buffer_size, :buffer_keep])
-    {success_failure_opts, opts} = split_success_failure_options(opts)
+    {on_success, opts} = Keyword.pop(opts, :on_success, :ack)
+    {on_failure, opts} = Keyword.pop(opts, :on_failure, :reject_and_requeue)
 
-    assert_valid_success_failure_opts!(success_failure_opts)
+    assert_valid_ack_option!(:on_success, on_success)
+    assert_valid_ack_option!(:on_failure, on_failure)
 
     config = init_client!(client, opts)
 
@@ -216,8 +218,8 @@ defmodule BroadwayRabbitMQ.Producer do
        conn_ref: nil,
        channel_ref: nil,
        opts: opts,
-       on_success: Keyword.fetch!(success_failure_opts, :on_success),
-       on_failure: Keyword.fetch!(success_failure_opts, :on_failure)
+       on_success: on_success,
+       on_failure: on_failure
      }, options}
   end
 
@@ -297,25 +299,19 @@ defmodule BroadwayRabbitMQ.Producer do
 
   @impl Acknowledger
   def configure(_channel, ack_data, options) do
-    assert_valid_success_failure_opts!(options)
+    Enum.each(options, fn
+      {name, val} when name in [:on_success, :on_failure] -> assert_valid_ack_option!(name, val)
+      {other, _value} -> raise ArgumentError, "unsupported configure option #{inspect(other)}"
+    end)
+
     ack_data = Map.merge(ack_data, Map.new(options))
     {:ok, ack_data}
   end
 
-  defp assert_valid_success_failure_opts!(options) do
-    assert_supported_value = fn
-      value when value in [:ack, :reject, :reject_and_requeue, :reject_and_requeue_once] ->
-        :ok
-
-      other ->
-        raise ArgumentError, "unsupported value for on_success/on_failure: #{inspect(other)}"
+  defp assert_valid_ack_option!(name, value) do
+    unless value in [:ack, :reject, :reject_and_requeue, :reject_and_requeue_once] do
+      raise ArgumentError, "unsupported value for #{inspect(name)} option: #{inspect(value)}"
     end
-
-    Enum.each(options, fn
-      {:on_success, value} -> assert_supported_value.(value)
-      {:on_failure, value} -> assert_supported_value.(value)
-      {other, _value} -> raise ArgumentError, "unsupported configure option #{inspect(other)}"
-    end)
   end
 
   @impl Producer
@@ -448,32 +444,5 @@ defmodule BroadwayRabbitMQ.Producer do
       {:error, message} ->
         raise ArgumentError, "invalid options given to #{inspect(client)}.init/1, " <> message
     end
-  end
-
-  defp split_success_failure_options(opts) do
-    {success_failure_opts, opts} = Keyword.split(opts, [:on_success, :on_failure])
-    {requeue, opts} = Keyword.pop(opts, :requeue)
-
-    # TODO: Remove when we remove support for :requeue.
-    if requeue do
-      IO.warn("the :requeue option is deprecated, use :on_failure instead")
-    end
-
-    on_failure =
-      Keyword.get_lazy(success_failure_opts, :on_failure, fn ->
-        case requeue do
-          nil -> :reject_and_requeue
-          :always -> :reject_and_requeue
-          :once -> :reject_and_requeue_once
-          :never -> :reject
-        end
-      end)
-
-    success_failure_opts = [
-      on_success: Keyword.get(success_failure_opts, :on_success, :ack),
-      on_failure: on_failure
-    ]
-
-    {success_failure_opts, opts}
   end
 end
