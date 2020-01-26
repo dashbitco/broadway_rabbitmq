@@ -271,7 +271,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
           assert_receive {:reject, {:configure, _opts, 1}, _}
         end)
 
-      assert log =~ "unsupported value for on_success/on_failure: :wat"
+      assert log =~ "unsupported value for :on_success option: :wat"
     end
   end
 
