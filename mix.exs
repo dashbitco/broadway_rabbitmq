@@ -1,7 +1,7 @@
 defmodule BroadwayRabbitMQ.MixProject do
   use Mix.Project
 
-  @version "0.5.0"
+  @version "0.6.0-rc.0"
   @description "A RabbitMQ connector for Broadway"
 
   def project do
@@ -26,7 +26,7 @@ defmodule BroadwayRabbitMQ.MixProject do
 
   defp deps do
     [
-      {:broadway, git: "https://github.com/dashbitco/broadway.git"},
+      {:broadway, "0.6.0-rc.0"},
       {:amqp, "~> 1.3"},
       {:ex_doc, ">= 0.19.0", only: :docs}
     ]
