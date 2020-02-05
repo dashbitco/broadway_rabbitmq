@@ -33,11 +33,11 @@ Configure Broadway with one or more producers using `BroadwayRabbitMQ.Producer`:
           module: {BroadwayRabbitMQ.Producer,
             queue: "my_queue",
           },
-          stages: 2
+          concurrency: 2
         ],
         processors: [
           default: [
-            stages: 50
+            concurrency: 50
           ]
         ]
       )

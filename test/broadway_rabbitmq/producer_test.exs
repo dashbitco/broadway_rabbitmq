@@ -523,16 +523,16 @@ defmodule BroadwayRabbitMQ.ProducerTest do
            on_success: on_success,
            on_failure: on_failure,
            merge_options: merge_options},
-        stages: 1
+        concurrency: 1
       ],
       processors: [
-        default: [stages: 1]
+        default: [concurrency: 1]
       ],
       batchers: [
         default: [
           batch_size: 2,
           batch_timeout: 50,
-          stages: 1
+          concurrency: 1
         ]
       ]
     )

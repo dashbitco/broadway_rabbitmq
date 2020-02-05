@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.6.0-rc.0
+
+  * Update to requirements of Broadway 0.6.0.
+  * Re-initialize client options on every reconnect. This means that the `:merge_options`
+    function is called on every reconnect, allowing to do things such as round-robin
+    on a list of RabbitMQ URLs.
+  * Remove support for the deprecated `:requeue` option. Use `:on_success`/`:on_failure`
+    instead.
+
 ## v0.5.0 (2019-11-04)
 
   * Add support for configuring acking behaviour using `:on_success` and `:on_failure` options
