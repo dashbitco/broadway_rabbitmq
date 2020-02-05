@@ -94,7 +94,7 @@ defmodule BroadwayRabbitMQ.Producer do
             qos: [
               prefetch_count: 50
             ]},
-          stages: 5
+          concurrency: 5
         ],
         processors: [
           default: []
@@ -147,7 +147,7 @@ defmodule BroadwayRabbitMQ.Producer do
             queue: "my_queue",
             declare: [],
             bindings: [{"my-exchange", []}]},
-          stages: 5
+          concurrency: 5
         ],
         processors: [
           default: []
