@@ -402,26 +402,31 @@ defmodule BroadwayRabbitMQ.Producer do
             channel_ref: channel_ref
         }
 
-      {:error, {:auth_failure, 'Disconnected'}} ->
+      {:error, reason} ->
+        handle_connection_failure(state, reason)
+    end
+  end
+
+  defp handle_connection_failure(state, reason) do
+    _ = Logger.error("Cannot connect to RabbitMQ broker: #{inspect(reason)}")
+
+    case reason do
+      {:auth_failure, 'Disconnected'} ->
         handle_backoff(state)
 
-      {:error, {:socket_closed_unexpectedly, :"connection.start"}} ->
+      {:socket_closed_unexpectedly, :"connection.start"} ->
         handle_backoff(state)
 
-      {:error, :econnrefused} ->
+      reason when reason in [:econnrefused, :unknown_host, :not_allowed] ->
         handle_backoff(state)
 
-      {:error, :unknown_host} ->
-        handle_backoff(state)
-
-      {:error, :not_allowed} ->
-        handle_backoff(state)
+      reason ->
+        _ = Logger.error("Crashing because of unexpected error when connecting to RabbitMQ")
+        raise "unexpected error when connecting to RabbitMQ broker"
     end
   end
 
   defp handle_backoff(%{backoff: backoff} = state) do
-    Logger.error("Cannot connect to RabbitMQ broker")
-
     new_backoff =
       if backoff do
         {timeout, backoff} = Backoff.backoff(backoff)
