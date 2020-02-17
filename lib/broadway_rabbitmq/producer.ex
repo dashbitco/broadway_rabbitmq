@@ -421,7 +421,8 @@ defmodule BroadwayRabbitMQ.Producer do
         handle_backoff(state)
 
       reason ->
-        raise "unexpected error when connecting to RabbitMQ broker: #{inspect(reason)}"
+        _ = Logger.error("Crashing because of unexpected error when connecting to RabbitMQ")
+        raise "unexpected error when connecting to RabbitMQ broker"
     end
   end
 
