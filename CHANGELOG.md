@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.6.0-rc.0
+## v0.6.0
 
   * Update to requirements of Broadway 0.6.0.
   * Re-initialize client options on every reconnect. This means that the `:merge_options`
@@ -8,6 +8,7 @@
     on a list of RabbitMQ URLs.
   * Remove support for the deprecated `:requeue` option. Use `:on_success`/`:on_failure`
     instead.
+  * Improve logging on RabbitMQ disconnections and reconnections.
 
 ## v0.5.0 (2019-11-04)
 
