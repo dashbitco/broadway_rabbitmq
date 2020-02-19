@@ -420,7 +420,7 @@ defmodule BroadwayRabbitMQ.Producer do
       reason when reason in [:econnrefused, :unknown_host, :not_allowed] ->
         handle_backoff(state)
 
-      reason ->
+      _other ->
         _ = Logger.error("Crashing because of unexpected error when connecting to RabbitMQ")
         raise "unexpected error when connecting to RabbitMQ broker"
     end
