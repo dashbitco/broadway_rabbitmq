@@ -73,7 +73,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     @impl true
-    def consume(_channel, _queue) do
+    def consume(_channel, _config) do
       :fake_consumer_tag
     end
 
