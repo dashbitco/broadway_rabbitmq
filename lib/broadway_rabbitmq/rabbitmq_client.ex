@@ -6,7 +6,8 @@ defmodule BroadwayRabbitMQ.RabbitmqClient do
   @typep config :: %{
            connection: keyword,
            qos: keyword,
-           metadata: list(atom())
+           metadata: list(atom()),
+           queue: String.t()
          }
 
   @callback init(opts :: any) :: {:ok, config} | {:error, any}
@@ -14,7 +15,7 @@ defmodule BroadwayRabbitMQ.RabbitmqClient do
   @callback ack(channel :: Channel.t(), delivery_tag :: Basic.delivery_tag()) :: any
   @callback reject(channel :: Channel.t(), delivery_tag :: Basic.delivery_tag(), opts :: keyword) ::
               any
-  @callback consume(channel :: Channel.t(), queue_name :: Basic.queue()) :: Basic.consumer_tag()
+  @callback consume(channel :: Channel.t(), config) :: Basic.consumer_tag()
   @callback cancel(channel :: Channel.t(), Basic.consumer_tag()) :: :ok | Basic.error()
   @callback close_connection(conn :: Connection.t()) :: :ok | {:error, any}
 end
