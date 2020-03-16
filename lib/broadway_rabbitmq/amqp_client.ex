@@ -24,7 +24,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :declare,
     :bindings,
     :broadway,
-    :merge_options
+    :merge_options,
+    :rabbitmq_setup_fun
   ]
 
   @default_metadata []
@@ -34,6 +35,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     with {:ok, merge_opts} <- validate_merge_opts(opts),
          opts = Keyword.merge(opts, merge_opts),
          {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
+         {:ok, rabbitmq_setup_fun} <- validate(opts, :rabbitmq_setup_fun, fn _ -> :ok end),
          {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
          {:ok, queue} <- validate(opts, :queue),
          {:ok, conn_opts} <- validate_conn_opts(opts),
@@ -47,7 +49,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          declare_opts: declare_opts,
          bindings: bindings,
          qos: qos_opts,
-         metadata: metadata
+         metadata: metadata,
+         rabbitmq_setup_fun: rabbitmq_setup_fun
        }}
     end
   end
@@ -56,10 +59,28 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   def setup_channel(config) do
     with {:ok, conn} <- Connection.open(config.connection),
          {:ok, channel} <- Channel.open(conn),
+         :ok <- call_rabbitmq_setup_fun(config, channel),
          :ok <- Basic.qos(channel, config.qos),
          {:ok, queue} <- maybe_declare_queue(channel, config.queue, config.declare_opts),
          :ok <- maybe_bind_queue(channel, queue, config.bindings) do
       {:ok, channel}
+    end
+  end
+
+  defp call_rabbitmq_setup_fun(%{rabbitmq_setup_fun: nil}, _channel) do
+    :ok
+  end
+
+  defp call_rabbitmq_setup_fun(%{rabbitmq_setup_fun: rabbitmq_setup_fun} = _config, channel) do
+    case rabbitmq_setup_fun.(channel) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
+
+      other ->
+        raise "unexpected return value from the :rabbitmq_setup_fun function: #{inspect(other)}"
     end
   end
 
@@ -158,6 +179,10 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     if Enum.all?(value, &is_tuple/1),
       do: {:ok, value},
       else: validation_error(:bindings, "a list of bindings (keyword lists)", value)
+  end
+
+  defp validate_option(:rabbitmq_setup_fun, value) when not is_function(value, 1) do
+    validation_error(:rabbitmq_setup_fun, "a function that takes one argument", value)
   end
 
   defp validate_option(_, value), do: {:ok, value}

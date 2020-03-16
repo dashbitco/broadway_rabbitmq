@@ -4,20 +4,24 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
   alias BroadwayRabbitMQ.AmqpClient
 
   test "default options" do
-    assert AmqpClient.init(queue: "queue") ==
-             {:ok,
-              %{
-                connection: [],
-                qos: [prefetch_count: 50],
-                metadata: [],
-                bindings: [],
-                declare_opts: nil,
-                queue: "queue"
-              }}
+    assert {:ok,
+            %{
+              connection: [],
+              qos: [prefetch_count: 50],
+              metadata: [],
+              bindings: [],
+              declare_opts: nil,
+              queue: "queue",
+              rabbitmq_setup_fun: rabbitmq_setup_fun
+            }} = AmqpClient.init(queue: "queue")
+
+    assert rabbitmq_setup_fun.(:channel) == :ok
   end
 
   describe "validate init options" do
     test "supported options" do
+      rabbitmq_setup_fun = fn _ -> :ok end
+
       connection = [
         username: nil,
         password: nil,
@@ -41,7 +45,8 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
       options = [
         queue: "queue",
         connection: connection,
-        qos: qos
+        qos: qos,
+        rabbitmq_setup_fun: rabbitmq_setup_fun
       ]
 
       metadata = []
@@ -54,7 +59,8 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
                   metadata: metadata,
                   bindings: [],
                   declare_opts: nil,
-                  queue: "queue"
+                  queue: "queue",
+                  rabbitmq_setup_fun: rabbitmq_setup_fun
                 }}
     end
 
