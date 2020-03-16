@@ -24,7 +24,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :declare,
     :bindings,
     :broadway,
-    :merge_options
+    :merge_options,
+    :after_connect
   ]
 
   @default_metadata []
@@ -34,6 +35,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     with {:ok, merge_opts} <- validate_merge_opts(opts),
          opts = Keyword.merge(opts, merge_opts),
          {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
+         {:ok, after_connect} <- validate(opts, :after_connect, fn _channel -> :ok end),
          {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
          {:ok, queue} <- validate(opts, :queue),
          {:ok, conn_opts} <- validate_conn_opts(opts),
@@ -47,7 +49,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          declare_opts: declare_opts,
          bindings: bindings,
          qos: qos_opts,
-         metadata: metadata
+         metadata: metadata,
+         after_connect: after_connect
        }}
     end
   end
@@ -56,10 +59,24 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   def setup_channel(config) do
     with {:ok, conn} <- Connection.open(config.connection),
          {:ok, channel} <- Channel.open(conn),
+         :ok <- call_after_connect(config, channel),
          :ok <- Basic.qos(channel, config.qos),
          {:ok, queue} <- maybe_declare_queue(channel, config.queue, config.declare_opts),
          :ok <- maybe_bind_queue(channel, queue, config.bindings) do
       {:ok, channel}
+    end
+  end
+
+  defp call_after_connect(config, channel) do
+    case config.after_connect.(channel) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
+
+      other ->
+        raise "unexpected return value from the :after_connect function: #{inspect(other)}"
     end
   end
 
@@ -158,6 +175,10 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     if Enum.all?(value, &is_tuple/1),
       do: {:ok, value},
       else: validation_error(:bindings, "a list of bindings (keyword lists)", value)
+  end
+
+  defp validate_option(:after_connect, value) when not is_function(value, 1) do
+    validation_error(:after_connect, "a function that takes one argument", value)
   end
 
   defp validate_option(_, value), do: {:ok, value}

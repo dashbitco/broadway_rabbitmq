@@ -69,6 +69,14 @@ defmodule BroadwayRabbitMQ.Producer do
       if you have multiple RabbitMQ URLs: in that case, you can reconnect to a different
       URL every time you reconnect to RabbitMQ, which avoids the case where the
       producer tries to always reconnect to a URL that is down.
+    * `:after_connect` - a function that takes the AMQP channel that the producer
+      is connected to and can run arbitrary setup. This is useful for declaring
+      complex RabbitMQ topologies with possibly multiple queues, bindings, or
+      exchanges. RabbitMQ declarations are generally idempotent so running this
+      function from all producer stages after every time they connect is likely
+      fine. This function can return `:ok` if everything went well or `{:error, reason}`.
+      In the error case then the producer will consider the connection failed and
+      will try to reconnect later (same behavior as when the connection drops, for example).
 
   > Note: choose the requeue strategy carefully. If you set the value to `:never`
   or `:once`, make sure you handle failed messages properly, either by logging
