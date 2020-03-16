@@ -35,7 +35,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     with {:ok, merge_opts} <- validate_merge_opts(opts),
          opts = Keyword.merge(opts, merge_opts),
          {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
-         {:ok, rabbitmq_setup_fun} <- validate(opts, :rabbitmq_setup_fun, fn _ -> :ok end),
+         {:ok, rabbitmq_setup_fun} <- validate(opts, :rabbitmq_setup_fun, fn _channel -> :ok end),
          {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
          {:ok, queue} <- validate(opts, :queue),
          {:ok, conn_opts} <- validate_conn_opts(opts),
@@ -67,12 +67,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  defp call_rabbitmq_setup_fun(%{rabbitmq_setup_fun: nil}, _channel) do
-    :ok
-  end
-
-  defp call_rabbitmq_setup_fun(%{rabbitmq_setup_fun: rabbitmq_setup_fun} = _config, channel) do
-    case rabbitmq_setup_fun.(channel) do
+  defp call_rabbitmq_setup_fun(config, channel) do
+    case config.rabbitmq_setup_fun.(channel) do
       :ok ->
         :ok
 
