@@ -12,15 +12,15 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
               bindings: [],
               declare_opts: nil,
               queue: "queue",
-              rabbitmq_setup_fun: rabbitmq_setup_fun
+              after_connect: after_connect
             }} = AmqpClient.init(queue: "queue")
 
-    assert rabbitmq_setup_fun.(:channel) == :ok
+    assert after_connect.(:channel) == :ok
   end
 
   describe "validate init options" do
     test "supported options" do
-      rabbitmq_setup_fun = fn _ -> :ok end
+      after_connect = fn _ -> :ok end
 
       connection = [
         username: nil,
@@ -46,7 +46,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
         queue: "queue",
         connection: connection,
         qos: qos,
-        rabbitmq_setup_fun: rabbitmq_setup_fun
+        after_connect: after_connect
       ]
 
       metadata = []
@@ -60,7 +60,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
                   bindings: [],
                   declare_opts: nil,
                   queue: "queue",
-                  rabbitmq_setup_fun: rabbitmq_setup_fun
+                  after_connect: after_connect
                 }}
     end
 
