@@ -208,7 +208,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
           :connection_timeout,
           :ssl_options,
           :client_properties,
-          :socket_options
+          :socket_options,
+          :auth_mechanisms
         ]
 
         validate_supported_opts(opts, _group = :connection, supported)
