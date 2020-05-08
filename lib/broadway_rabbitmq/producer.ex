@@ -201,7 +201,7 @@ defmodule BroadwayRabbitMQ.Producer do
   @impl true
   def init(opts) do
     Process.flag(:trap_exit, true)
-    client = opts[:client] || BroadwayRabbitMQ.AmqpClient
+    {client, opts} = Keyword.pop(opts, :client, BroadwayRabbitMQ.AmqpClient)
     {gen_stage_opts, opts} = Keyword.split(opts, [:buffer_size, :buffer_keep])
     {on_success, opts} = Keyword.pop(opts, :on_success, :ack)
     {on_failure, opts} = Keyword.pop(opts, :on_failure, :reject_and_requeue)
