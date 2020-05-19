@@ -16,6 +16,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   @supported_options [
     :queue,
     :connection,
+    :name,
     :qos,
     :backoff_min,
     :backoff_max,
@@ -37,6 +38,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
          {:ok, after_connect} <- validate(opts, :after_connect, fn _channel -> :ok end),
          {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
+         {:ok, name} <- validate(opts, :name, :undefined),
          {:ok, queue} <- validate(opts, :queue),
          {:ok, conn_opts} <- validate_conn_opts(opts),
          {:ok, declare_opts} <- validate_declare_opts(opts, queue),
@@ -46,6 +48,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
        %{
          connection: conn_opts,
          queue: queue,
+         name: name,
          declare_opts: declare_opts,
          bindings: bindings,
          qos: qos_opts,
@@ -57,7 +60,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   @impl true
   def setup_channel(config) do
-    with {:ok, conn} <- Connection.open(config.connection),
+    with {name, config} <- Map.pop(config, :name, :undefined),
+         {:ok, conn} <- Connection.open(config.connection, name),
          {:ok, channel} <- Channel.open(conn),
          :ok <- call_after_connect(config, channel),
          :ok <- Basic.qos(channel, config.qos),
@@ -164,6 +168,11 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   defp validate_option(:connection, value) when not (is_binary(value) or is_list(value)),
     do: validation_error(:connection, "a URI or a keyword list", value)
+
+  defp validate_option(:name, :undefined), do: {:ok, :undefined}
+
+  defp validate_option(:name, value) when not is_binary(value),
+    do: validation_error(:name, "a binary or :undefined atom", value)
 
   defp validate_option(:metadata, value) when is_list(value) do
     if Enum.all?(value, &is_atom/1),

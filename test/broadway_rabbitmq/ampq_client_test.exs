@@ -18,6 +18,10 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     assert after_connect.(:channel) == :ok
   end
 
+  test "connection name" do
+    assert {:ok, %{name: "conn_name"}} = AmqpClient.init(queue: "queue", name: "conn_name")
+  end
+
   describe "validate init options" do
     test "supported options" do
       after_connect = fn _ -> :ok end
@@ -55,6 +59,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
                {:ok,
                 %{
                   connection: connection,
+                  name: :undefined,
                   qos: qos,
                   metadata: metadata,
                   bindings: [],
