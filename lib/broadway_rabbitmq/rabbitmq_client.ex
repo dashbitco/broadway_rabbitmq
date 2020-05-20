@@ -5,6 +5,7 @@ defmodule BroadwayRabbitMQ.RabbitmqClient do
 
   @typep config :: %{
            connection: keyword,
+           name: binary() | :undefined,
            qos: keyword,
            metadata: list(atom()),
            queue: String.t()
