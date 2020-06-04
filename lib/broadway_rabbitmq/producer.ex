@@ -363,7 +363,7 @@ defmodule BroadwayRabbitMQ.Producer do
         end
       catch
         kind, reason ->
-          Logger.error(Exception.format(kind, reason, System.stacktrace()))
+          Logger.error(Exception.format(kind, reason, __STACKTRACE__))
       end
     end)
   end
