@@ -280,10 +280,10 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       {:ok, broadway} = start_broadway(on_failure: :reject_and_requeue)
 
       deliver_messages(broadway, [1, :fail], redelivered: true)
-      assert_receive {:reject, :fail, opts}
+      assert_receive {:reject, :fail, _opts}
 
       deliver_messages(broadway, [2, :fail], redelivered: false)
-      assert_receive {:reject, :fail, opts}
+      assert_receive {:reject, :fail, _opts}
 
       refute_receive {:reject, :fail, _}
 
@@ -310,10 +310,10 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       {:ok, broadway} = start_broadway(on_failure: :reject_and_requeue_once)
 
       deliver_messages(broadway, [1, :fail], redelivered: true)
-      assert_receive {:reject, :fail, opts}
+      assert_receive {:reject, :fail, _opts}
 
       deliver_messages(broadway, [2, :fail], redelivered: false)
-      assert_receive {:reject, :fail, opts}
+      assert_receive {:reject, :fail, _opts}
 
       refute_receive {:reject, :fail, _}
 
@@ -395,7 +395,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     test "log error when trying to acknowledge" do
       {:ok, broadway} = start_broadway()
-      assert_receive {:setup_channel, :ok, channel}
+      assert_receive {:setup_channel, :ok, _channel}
 
       assert capture_log(fn ->
                deliver_messages(broadway, [:break_conn])
@@ -490,7 +490,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   test "close connection on terminate" do
     {:ok, broadway} = start_broadway()
-    assert_receive {:setup_channel, :ok, channel}
+    assert_receive {:setup_channel, :ok, _channel}
     Process.exit(broadway, :shutdown)
     assert_receive :connection_closed
   end
