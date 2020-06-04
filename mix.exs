@@ -26,7 +26,7 @@ defmodule BroadwayRabbitMQ.MixProject do
 
   defp deps do
     [
-      {:broadway, "0.6.0"},
+      {:broadway, "~> 0.6.0"},
       {:amqp, "~> 1.3"},
       {:ex_doc, ">= 0.19.0", only: :docs}
     ]
