@@ -1,8 +1,15 @@
 # Changelog
 
+## v0.6.1
+
+  * Add support for the `:after_connect` option.
+  * Add `auth_mechanisms` to the supported connection options for RabbitMQ.
+  * Support passing in an AMQP connection name.
+  * Update Broadway requirement to `~> 0.6.0` (it was exactly `0.6.0`) before.
+
 ## v0.6.0
 
-  * Update to requirements of Broadway 0.6.0.
+  * Update Broadway requirement to 0.6.0.
   * Re-initialize client options on every reconnect. This means that the `:merge_options`
     function is called on every reconnect, allowing to do things such as round-robin
     on a list of RabbitMQ URLs.
