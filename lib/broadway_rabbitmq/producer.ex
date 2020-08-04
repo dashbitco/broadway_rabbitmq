@@ -186,6 +186,53 @@ defmodule BroadwayRabbitMQ.Producer do
       the first time. If a message was already requeued and redelivered, it will be
       rejected and not requeued again.
 
+  ## Metadata
+
+  You can retrieve additional information about your message by setting the `:metadata` option.
+  This is useful in a handful of situations like when you are interested in the message headers
+  or in knowing if the message is new or redelivered.
+
+  Here is the list of all possible values supported by `:metadata`:
+
+    * `:delivery_tag` - an integer that uniquely identifies the delivery on a channel.
+      It's used internally in AMQP client library methods, like acknowledging or rejecting a message.
+
+    * `:redelivered` - a boolean representing if the message was already rejected and requeued before.
+
+    * `:exchange` - the name of the exchange the queue was bound to.
+
+    * `:routing_key` - the name of the queue from which the message was consumed.
+
+    * `:message_count` - the current number of messages in the queue
+
+    * `:content_type` - the MIME type of the message.
+
+    * `:content_encoding` - the MIME content encoding of the message.
+
+    * `:headers` - the headers of the message, which are returned in tuples of type
+    {String.t(), argument_type(), term()}. The last value of the tuple is the value of the header.
+    You can find a list of argument types [here](https://hexdocs.pm/amqp/readme.html#types-of-arguments-and-headers).
+
+    * `:persistent` - a boolean stating whether or not the message was published with disk persistence.
+
+    * `:priority` - an integer representing the message priority on the queue.
+
+    * `:correlation_id` - it's a useful property of AMQP protocol to correlate RPC requests.
+    You can read more about RPC in RabbitMQ [here](https://www.rabbitmq.com/tutorials/tutorial-six-python.html).
+
+    * `:message_id` - application specific message identifier.
+
+    * `:timestamp` - a timestamp associated with the message.
+
+    * `:type` - message type as a string
+
+    * `:user_id` - a user identifier that could have been assigned during message publication.
+    RabbitMQ validated this value against the active connection when the message was published.
+
+    * `:app_id` - publishing application identifier.
+
+    * `:cluster_id` - RabbitMQ cluster identifier.
+
   """
 
   use GenStage
