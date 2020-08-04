@@ -28,7 +28,14 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :merge_options,
     :after_connect
   ]
-
+  @supported_declare_options [
+    :durable,
+    :auto_delete,
+    :exclusive,
+    :passive,
+    :no_wait,
+    :arguments
+  ]
   @default_metadata []
 
   @impl true
@@ -41,7 +48,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          {:ok, name} <- validate(opts, :name, :undefined),
          {:ok, queue} <- validate(opts, :queue),
          {:ok, conn_opts} <- validate_conn_opts(opts),
-         {:ok, declare_opts} <- validate_declare_opts(opts, queue),
+         {:ok, declare_opts} <- validate_declare_opts(opts, queue, @supported_declare_options),
          {:ok, bindings} <- validate_bindings(opts),
          {:ok, qos_opts} <- validate_qos_opts(opts) do
       {:ok,
@@ -225,7 +232,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  defp validate_declare_opts(opts, queue) do
+  defp validate_declare_opts(opts, queue, supported_declare_options) do
     case Keyword.fetch(opts, :declare) do
       :error when queue == "" ->
         {:error, "can't use \"\" (server autogenerate) as the queue name without the :declare"}
@@ -234,8 +241,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         {:ok, nil}
 
       {:ok, declare_opts} ->
-        supported = [:durable, :auto_delete, :exclusive, :passive, :no_wait, :arguments]
-        validate_supported_opts(declare_opts, :declare, supported)
+        validate_supported_opts(declare_opts, :declare, supported_declare_options)
     end
   end
 
