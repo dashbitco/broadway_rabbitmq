@@ -28,7 +28,21 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :merge_options,
     :after_connect
   ]
-
+  @supported_connection_options [
+    :username,
+    :password,
+    :virtual_host,
+    :host,
+    :port,
+    :channel_max,
+    :frame_max,
+    :heartbeat,
+    :connection_timeout,
+    :ssl_options,
+    :client_properties,
+    :socket_options,
+    :auth_mechanisms
+  ]
   @default_metadata []
 
   @impl true
@@ -40,7 +54,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
          {:ok, name} <- validate(opts, :name, :undefined),
          {:ok, queue} <- validate(opts, :queue),
-         {:ok, conn_opts} <- validate_conn_opts(opts),
+         {:ok, conn_opts} <- validate_conn_opts(opts, @supported_connection_options),
          {:ok, declare_opts} <- validate_declare_opts(opts, queue),
          {:ok, bindings} <- validate_bindings(opts),
          {:ok, qos_opts} <- validate_qos_opts(opts) do
@@ -196,7 +210,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     {:error, "expected #{inspect(option)} to be #{expected}, got: #{inspect(value)}"}
   end
 
-  defp validate_conn_opts(opts) do
+  defp validate_conn_opts(opts, supported_opts) do
     case Keyword.get(opts, :connection, []) do
       uri when is_binary(uri) ->
         case uri |> to_charlist() |> :amqp_uri.parse() do
@@ -205,23 +219,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         end
 
       opts when is_list(opts) ->
-        supported = [
-          :username,
-          :password,
-          :virtual_host,
-          :host,
-          :port,
-          :channel_max,
-          :frame_max,
-          :heartbeat,
-          :connection_timeout,
-          :ssl_options,
-          :client_properties,
-          :socket_options,
-          :auth_mechanisms
-        ]
-
-        validate_supported_opts(opts, _group = :connection, supported)
+        validate_supported_opts(opts, _group = :connection, supported_opts)
     end
   end
 
