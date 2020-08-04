@@ -33,8 +33,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   @impl true
   def init(opts) do
-    with {:ok, merge_opts} <- validate_merge_opts(opts),
-         opts = Keyword.merge(opts, merge_opts),
+    with {:ok, opts} <- validate_merge_opts(opts),
          {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
          {:ok, after_connect} <- validate(opts, :after_connect, fn _channel -> :ok end),
          {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
@@ -142,7 +141,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         merge_opts = fun.(index)
 
         if Keyword.keyword?(merge_opts) do
-          {:ok, merge_opts}
+          {:ok, Keyword.merge(opts, merge_opts)}
         else
           message =
             "The :merge_options function should return a keyword list, " <>
@@ -155,7 +154,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         {:error, ":merge_options must be a function with arity 1, got: #{inspect(other)}"}
 
       :error ->
-        {:ok, _merge_opts = []}
+        {:ok, opts}
     end
   end
 
