@@ -28,6 +28,21 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :merge_options,
     :after_connect
   ]
+  @supported_connection_options [
+    :username,
+    :password,
+    :virtual_host,
+    :host,
+    :port,
+    :channel_max,
+    :frame_max,
+    :heartbeat,
+    :connection_timeout,
+    :ssl_options,
+    :client_properties,
+    :socket_options,
+    :auth_mechanisms
+  ]
   @supported_declare_options [
     :durable,
     :auto_delete,
@@ -40,14 +55,13 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   @impl true
   def init(opts) do
-    with {:ok, merge_opts} <- validate_merge_opts(opts),
-         opts = Keyword.merge(opts, merge_opts),
+    with {:ok, opts} <- validate_merge_opts(opts),
          {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
          {:ok, after_connect} <- validate(opts, :after_connect, fn _channel -> :ok end),
          {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
          {:ok, name} <- validate(opts, :name, :undefined),
          {:ok, queue} <- validate(opts, :queue),
-         {:ok, conn_opts} <- validate_conn_opts(opts),
+         {:ok, conn_opts} <- validate_conn_opts(opts, @supported_connection_options),
          {:ok, declare_opts} <- validate_declare_opts(opts, queue, @supported_declare_options),
          {:ok, bindings} <- validate_bindings(opts),
          {:ok, qos_opts} <- validate_qos_opts(opts) do
@@ -149,7 +163,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         merge_opts = fun.(index)
 
         if Keyword.keyword?(merge_opts) do
-          {:ok, merge_opts}
+          {:ok, Keyword.merge(opts, merge_opts)}
         else
           message =
             "The :merge_options function should return a keyword list, " <>
@@ -162,7 +176,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         {:error, ":merge_options must be a function with arity 1, got: #{inspect(other)}"}
 
       :error ->
-        {:ok, _merge_opts = []}
+        {:ok, opts}
     end
   end
 
@@ -203,7 +217,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     {:error, "expected #{inspect(option)} to be #{expected}, got: #{inspect(value)}"}
   end
 
-  defp validate_conn_opts(opts) do
+  defp validate_conn_opts(opts, supported_opts) do
     case Keyword.get(opts, :connection, []) do
       uri when is_binary(uri) ->
         case uri |> to_charlist() |> :amqp_uri.parse() do
@@ -212,23 +226,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         end
 
       opts when is_list(opts) ->
-        supported = [
-          :username,
-          :password,
-          :virtual_host,
-          :host,
-          :port,
-          :channel_max,
-          :frame_max,
-          :heartbeat,
-          :connection_timeout,
-          :ssl_options,
-          :client_properties,
-          :socket_options,
-          :auth_mechanisms
-        ]
-
-        validate_supported_opts(opts, _group = :connection, supported)
+        validate_supported_opts(opts, _group = :connection, supported_opts)
     end
   end
 
