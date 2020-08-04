@@ -51,6 +51,10 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :no_wait,
     :arguments
   ]
+  @support_qos_options [
+    :prefetch_size,
+    :prefetch_count
+  ]
   @default_metadata []
 
   @impl true
@@ -64,7 +68,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          {:ok, conn_opts} <- validate_conn_opts(opts, @supported_connection_options),
          {:ok, declare_opts} <- validate_declare_opts(opts, queue, @supported_declare_options),
          {:ok, bindings} <- validate_bindings(opts),
-         {:ok, qos_opts} <- validate_qos_opts(opts) do
+         {:ok, qos_opts} <- validate_qos_opts(opts, @support_qos_options) do
       {:ok,
        %{
          connection: conn_opts,
@@ -260,14 +264,12 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  defp validate_qos_opts(opts) do
-    group = :qos
-    qos_opts = opts[group] || []
-    supported = [:prefetch_size, :prefetch_count]
+  defp validate_qos_opts(opts, supported_qos_options) do
+    qos_opts = opts[:qos] || []
 
     qos_opts
     |> Keyword.put_new(:prefetch_count, @default_prefetch_count)
-    |> validate_supported_opts(group, supported)
+    |> validate_supported_opts(:qos, supported_qos_options)
   end
 
   defp validate_supported_opts(opts, group_name, supported_opts) do
