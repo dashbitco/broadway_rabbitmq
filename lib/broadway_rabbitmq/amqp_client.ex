@@ -51,6 +51,15 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :no_wait,
     :arguments
   ]
+  @support_qos_options [
+    :prefetch_size,
+    :prefetch_count
+  ]
+  @supported_bindings_options [
+    :routing_key,
+    :no_wait,
+    :arguments
+  ]
   @default_metadata []
 
   @impl true
@@ -63,8 +72,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          {:ok, queue} <- validate(opts, :queue),
          {:ok, conn_opts} <- validate_conn_opts(opts, @supported_connection_options),
          {:ok, declare_opts} <- validate_declare_opts(opts, queue, @supported_declare_options),
-         {:ok, bindings} <- validate_bindings(opts),
-         {:ok, qos_opts} <- validate_qos_opts(opts) do
+         {:ok, bindings} <- validate_bindings(opts, @supported_bindings_options),
+         {:ok, qos_opts} <- validate_qos_opts(opts, @support_qos_options) do
       {:ok,
        %{
          connection: conn_opts,
@@ -243,13 +252,11 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  defp validate_bindings(opts) do
+  defp validate_bindings(opts, supported_bindings_options) do
     with {:ok, bindings} <- validate(opts, :bindings, _default = []) do
       Enum.reduce_while(bindings, {:ok, bindings}, fn
         {exchange, binding_opts}, acc when is_binary(exchange) ->
-          supported = [:routing_key, :no_wait, :arguments]
-
-          case validate_supported_opts(binding_opts, :bindings, supported) do
+          case validate_supported_opts(binding_opts, :bindings, supported_bindings_options) do
             {:ok, _bindings_opts} -> {:cont, acc}
             {:error, reason} -> {:halt, {:error, reason}}
           end
@@ -260,14 +267,12 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  defp validate_qos_opts(opts) do
-    group = :qos
-    qos_opts = opts[group] || []
-    supported = [:prefetch_size, :prefetch_count]
+  defp validate_qos_opts(opts, supported_qos_options) do
+    qos_opts = opts[:qos] || []
 
     qos_opts
     |> Keyword.put_new(:prefetch_count, @default_prefetch_count)
-    |> validate_supported_opts(group, supported)
+    |> validate_supported_opts(:qos, supported_qos_options)
   end
 
   defp validate_supported_opts(opts, group_name, supported_opts) do
