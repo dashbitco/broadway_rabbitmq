@@ -77,6 +77,8 @@ defmodule BroadwayRabbitMQ.Producer do
       fine. This function can return `:ok` if everything went well or `{:error, reason}`.
       In the error case then the producer will consider the connection failed and
       will try to reconnect later (same behavior as when the connection drops, for example).
+      This function is run **before** the declaring and binding queues according to
+      the `:declare` and `:bindings` options (described above).
 
   > Note: choose the requeue strategy carefully. If you set the value to `:never`
   or `:once`, make sure you handle failed messages properly, either by logging
