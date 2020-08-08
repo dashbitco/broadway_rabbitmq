@@ -8,7 +8,7 @@ on:
 
 jobs:
   mix_test:
-    name: mix test (Erlang/OTP ${{matrix.otp}} | Elixir ${{matrix.elixir}})
+    name: mix test (Elixir ${{matrix.elixir}} | Erlang/OTP ${{matrix.otp}})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
