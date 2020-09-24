@@ -177,16 +177,22 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:ack` - acknowledge the message. RabbitMQ will mark the message as acked and
       will not redeliver it to any other consumer.
 
-    * `:reject` - rejects the message without requeuing (basically, discards the message).
-      RabbitMQ will not redeliver the message to any other consumer.
+    * `:reject` - rejects the message without requeuing (basically, discards
+       the message).  RabbitMQ will not redeliver the message to any other
+       consumer, but a queue can be configured to send rejected messages to a
+       [dead letter exchange](https://www.rabbitmq.com/dlx.html), where another
+       consumer can see why it was dead lettered, how many times, etc, and
+       potentially republish it.
 
     * `:reject_and_requeue` - rejects the message and tells RabbitMQ to requeue it so
-      that it can be delivered to a consumer again. `:reject_and_requeue` always
-      requeues the message.
+      that it can be delivered to a consumer again. `:reject_and_requeue`
+      always requeues the message. If the message is unprocessable, this will
+      cause an infinite loop of retries.
 
     * `:reject_and_requeue_once` - rejects the message and tells RabbitMQ to requeue it
       the first time. If a message was already requeued and redelivered, it will be
-      rejected and not requeued again.
+      rejected and not requeued again. This feature uses Broadway-specific message metadata,
+      not RabbitMQ's dead lettering feature.
 
   ## Metadata
 
