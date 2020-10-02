@@ -2,6 +2,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   use ExUnit.Case
 
   import ExUnit.CaptureLog
+  import ExUnit.CaptureIO
   alias Broadway.Message
 
   defmodule FakeChannel do
@@ -138,7 +139,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       ArgumentError,
       "invalid options given to BroadwayRabbitMQ.AmqpClient.init/1, expected :queue to be a string, got: nil",
       fn ->
-        BroadwayRabbitMQ.Producer.init(queue: nil)
+        BroadwayRabbitMQ.Producer.init(queue: nil, on_failure: :reject_and_requeue)
       end
     )
   end
@@ -148,14 +149,29 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       ArgumentError,
       "unknown type :unknown_type",
       fn ->
-        BroadwayRabbitMQ.Producer.init(queue: "test", backoff_type: :unknown_type)
+        BroadwayRabbitMQ.Producer.init(
+          queue: "test",
+          backoff_type: :unknown_type,
+          on_failure: :reject_and_requeue
+        )
       end
     )
   end
 
+  test "prints a deprecation warning when :on_failure is not specified" do
+    stderr =
+      capture_io(:stderr, fn ->
+        BroadwayRabbitMQ.Producer.init(queue: "test")
+      end)
+
+    assert stderr =~ ":on_failure should be specified"
+  end
+
   test "producer :buffer_size is :prefetch_count * 5" do
     qos = [prefetch_count: 12]
-    {:producer, _, options} = BroadwayRabbitMQ.Producer.init(queue: "test", qos: qos)
+
+    {:producer, _, options} =
+      BroadwayRabbitMQ.Producer.init(queue: "test", qos: qos, on_failure: :reject_and_requeue)
 
     assert options[:buffer_size] == 60
   end
@@ -166,7 +182,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
         queue: "test",
         qos: [prefetch_count: 12],
         buffer_size: 100,
-        buffer_keep: :first
+        buffer_keep: :first,
+        on_failure: :reject_and_requeue
       )
 
     assert options[:buffer_size] == 100
@@ -178,7 +195,11 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       ArgumentError,
       ":prefetch_count is 0, specify :buffer_size explicitly",
       fn ->
-        BroadwayRabbitMQ.Producer.init(queue: "test", qos: [prefetch_count: 0])
+        BroadwayRabbitMQ.Producer.init(
+          queue: "test",
+          qos: [prefetch_count: 0],
+          on_failure: :reject_and_requeue
+        )
       end
     )
   end
