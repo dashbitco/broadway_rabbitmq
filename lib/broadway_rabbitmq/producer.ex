@@ -253,13 +253,18 @@ defmodule BroadwayRabbitMQ.Producer do
   @behaviour Acknowledger
   @behaviour Producer
 
+  @default_on_failure :reject_and_requeue
+
   @impl true
   def init(opts) do
     Process.flag(:trap_exit, true)
+
+    maybe_warn_unspecified_on_failure_opt(opts)
+
     {client, opts} = Keyword.pop(opts, :client, BroadwayRabbitMQ.AmqpClient)
     {gen_stage_opts, opts} = Keyword.split(opts, [:buffer_size, :buffer_keep])
     {on_success, opts} = Keyword.pop(opts, :on_success, :ack)
-    {on_failure, opts} = Keyword.pop(opts, :on_failure, :reject_and_requeue)
+    {on_failure, opts} = Keyword.pop(opts, :on_failure, @default_on_failure)
 
     assert_valid_ack_option!(:on_success, on_success)
     assert_valid_ack_option!(:on_failure, on_failure)
@@ -514,6 +519,21 @@ defmodule BroadwayRabbitMQ.Producer do
 
       {:error, message} ->
         raise ArgumentError, "invalid options given to #{inspect(client)}.init/1, " <> message
+    end
+  end
+
+  # TODO: Remove when we remove the default value
+  defp maybe_warn_unspecified_on_failure_opt(opts) do
+    unless Keyword.has_key?(opts, :on_failure) do
+      name = get_in(opts, [:broadway, :name])
+
+      {:ok, vsn} = :application.get_key(:broadway_rabbitmq, :vsn)
+
+      IO.warn(
+        ":on_failure should be specified for Broadway topology with name #{inspect(name)}; assuming #{
+          inspect(@default_on_failure)
+        }. See documentation for valid values: https://hexdocs.pm/broadway_rabbitmq/#{vsn}/BroadwayRabbitMQ.Producer.html#module-acking"
+      )
     end
   end
 end

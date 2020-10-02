@@ -1,13 +1,17 @@
 # Changelog
 
-## v0.6.1
+## Unreleased
+
+  * Deprecate use of a default `:on_failure` option.
+
+## v0.6.1 (2020-06-05)
 
   * Add support for the `:after_connect` option.
   * Add `auth_mechanisms` to the supported connection options for RabbitMQ.
   * Support passing in an AMQP connection name.
   * Update Broadway requirement to `~> 0.6.0` (it was exactly `0.6.0`) before.
 
-## v0.6.0
+## v0.6.0 (2020-02-19)
 
   * Update Broadway requirement to 0.6.0.
   * Re-initialize client options on every reconnect. This means that the `:merge_options`
