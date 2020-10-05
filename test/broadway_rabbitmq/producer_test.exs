@@ -447,7 +447,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
       producer = get_producer(broadway)
 
-      send(producer, {:basic_cancel, %{delievery_tag: "my-delivery-tag"}})
+      send(producer, {:basic_cancel, %{consumer_tag: :fake_consumer_tag}})
 
       assert_receive {:setup_channel, :ok, channel_2}
 

@@ -303,11 +303,12 @@ defmodule BroadwayRabbitMQ.Producer do
 
   # RabbitMQ sends this in a few scenarios, like if the queue this consumer
   # is consuming from gets deleted. See https://www.rabbitmq.com/consumer-cancel.html.
-  def handle_info({:basic_cancel, _}, state) do
+  def handle_info({:basic_cancel, %{consumer_tag: tag}}, %{consumer_tag: tag} = state) do
+    Logger.warn("Received AMQP basic_cancel from RabbitMQ")
     {:noreply, [], connect(state, :init_client)}
   end
 
-  def handle_info({:basic_cancel_ok, _}, state) do
+  def handle_info({:basic_cancel_ok, %{consumer_tag: tag}}, %{consumer_tag: tag} = state) do
     {:noreply, [], %{state | consumer_tag: nil}}
   end
 
@@ -332,11 +333,13 @@ defmodule BroadwayRabbitMQ.Producer do
     {:noreply, [message], state}
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, _reason}, %{conn_ref: ref} = state) do
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %{conn_ref: ref} = state) do
+    Logger.warn("AMQP connection went down with reason: #{inspect(reason)}")
     {:noreply, [], connect(state, :init_client)}
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, _reason}, %{channel_ref: ref} = state) do
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %{channel_ref: ref} = state) do
+    Logger.warn("AMQP channel went down with reason: #{inspect(reason)}")
     {:noreply, [], connect(state, :init_client)}
   end
 
@@ -423,7 +426,8 @@ defmodule BroadwayRabbitMQ.Producer do
         end
       catch
         kind, reason ->
-          Logger.error(Exception.format(kind, reason, __STACKTRACE__))
+          formatted_error = Exception.format(kind, reason, __STACKTRACE__)
+          Logger.error("Could not ack/reject message: #{formatted_error}")
       end
     end)
   end
