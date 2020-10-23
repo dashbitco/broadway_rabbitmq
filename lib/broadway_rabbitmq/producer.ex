@@ -32,7 +32,10 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
        to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for
        random exponential (default: `:rand_exp`)
-    * `:metadata` - The list of AMQP metadata fields to copy (default: `[]`)
+    * `:metadata` - The list of AMQP metadata fields to copy (default: `[]`). Note
+      that every `Broadway.Message` contains an `:amqp_channel` in its `metadata` field.
+      It contains the `AMQP.Channel` struct. You can use it to do things like
+      publish messages back to RabbitMQ (for use cases such as RPCs).
     * `:declare` - Optional. A list of options used to declare the `:queue`. The
       queue is only declared (and possibly created if not already there) if this
       option is present and not `nil`. Note that if you use `""` as the queue
@@ -324,9 +327,14 @@ defmodule BroadwayRabbitMQ.Producer do
       on_failure: state.on_failure
     }
 
+    metadata =
+      meta
+      |> Map.take(config[:metadata])
+      |> Map.put(:amqp_channel, channel)
+
     message = %Message{
       data: payload,
-      metadata: Map.take(meta, config[:metadata]),
+      metadata: metadata,
       acknowledger: {__MODULE__, _ack_ref = channel, ack_data}
     }
 
