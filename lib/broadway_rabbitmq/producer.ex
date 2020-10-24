@@ -34,8 +34,7 @@ defmodule BroadwayRabbitMQ.Producer do
        random exponential (default: `:rand_exp`)
     * `:metadata` - The list of AMQP metadata fields to copy (default: `[]`). Note
       that every `Broadway.Message` contains an `:amqp_channel` in its `metadata` field.
-      It contains the `AMQP.Channel` struct. You can use it to do things like
-      publish messages back to RabbitMQ (for use cases such as RPCs).
+      See the "Metadata" section below.
     * `:declare` - Optional. A list of options used to declare the `:queue`. The
       queue is only declared (and possibly created if not already there) if this
       option is present and not `nil`. Note that if you use `""` as the queue
@@ -202,6 +201,13 @@ defmodule BroadwayRabbitMQ.Producer do
   You can retrieve additional information about your message by setting the `:metadata` option.
   This is useful in a handful of situations like when you are interested in the message headers
   or in knowing if the message is new or redelivered.
+
+  These are the keys in the metadata map that are *always present*:
+
+    * `:amqp_channel` - It contains the `AMQP.Channel` struct. You can use it to do things
+      like publish messages back to RabbitMQ (for use cases such as RPCs). You *should not*
+      do things with the channel other than publish messages with `AMQP.Basic.publish/5`. Other
+      operations may result in undesired effects.
 
   Here is the list of all possible values supported by `:metadata`:
 
