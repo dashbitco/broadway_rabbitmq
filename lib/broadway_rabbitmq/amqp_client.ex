@@ -51,40 +51,59 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     :no_wait,
     :arguments
   ]
-  @support_qos_options [
-    :prefetch_size,
-    :prefetch_count
-  ]
   @supported_bindings_options [
     :routing_key,
     :no_wait,
     :arguments
   ]
-  @default_metadata []
+
+  @opts_schema [
+    queue: [type: :string, required: true],
+    connection: [type: :any],
+    name: [type: {:custom, __MODULE__, :__validate_connection_name__, []}, default: :undefined],
+    qos: [
+      type: :keyword_list,
+      keys: [
+        prefetch_size: [type: :non_neg_integer],
+        prefetch_count: [type: :non_neg_integer, default: @default_prefetch_count]
+      ],
+      default: []
+    ],
+    backoff_min: [type: :any],
+    backoff_max: [type: :any],
+    backoff_type: [type: :any],
+    metadata: [type: {:custom, __MODULE__, :__validate_list__, [:atom, "atoms"]}, default: []],
+    declare: [type: :any],
+    bindings: [type: :any],
+    broadway: [type: :any],
+    merge_options: [type: :any],
+    after_connect: [type: {:fun, 1}]
+  ]
 
   @impl true
   def init(opts) do
     with {:ok, opts} <- validate_merge_opts(opts),
-         {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
-         {:ok, after_connect} <- validate(opts, :after_connect, fn _channel -> :ok end),
-         {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
-         {:ok, name} <- validate(opts, :name, :undefined),
-         {:ok, queue} <- validate(opts, :queue),
+         {:ok, opts} <- NimbleOptions.validate(opts, @opts_schema),
+         after_connect = opts[:after_connect] || fn _channel -> :ok end,
+         #
          {:ok, conn_opts} <- validate_conn_opts(opts, @supported_connection_options),
-         {:ok, declare_opts} <- validate_declare_opts(opts, queue, @supported_declare_options),
-         {:ok, bindings} <- validate_bindings(opts, @supported_bindings_options),
-         {:ok, qos_opts} <- validate_qos_opts(opts, @support_qos_options) do
+         {:ok, declare_opts} <-
+           validate_declare_opts(opts, Keyword.fetch!(opts, :queue), @supported_declare_options),
+         {:ok, bindings} <- validate_bindings(opts, @supported_bindings_options) do
       {:ok,
        %{
          connection: conn_opts,
-         queue: queue,
-         name: name,
+         queue: Keyword.fetch!(opts, :queue),
+         name: Keyword.fetch!(opts, :name),
          declare_opts: declare_opts,
          bindings: bindings,
-         qos: qos_opts,
-         metadata: metadata,
+         qos: Keyword.fetch!(opts, :qos),
+         metadata: Keyword.fetch!(opts, :metadata),
          after_connect: after_connect
        }}
+    else
+      {:error, %NimbleOptions.ValidationError{} = error} -> {:error, Exception.message(error)}
+      {:error, message} when is_binary(message) -> {:error, message}
     end
   end
 
@@ -204,10 +223,26 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   defp validate_option(:name, value) when not is_binary(value),
     do: validation_error(:name, "a binary or :undefined atom", value)
 
-  defp validate_option(:metadata, value) when is_list(value) do
-    if Enum.all?(value, &is_atom/1),
-      do: {:ok, value},
-      else: validation_error(:metadata, "a list of atoms", value)
+  def __validate_list__(value, subtype, expected) do
+    subtype_predicate =
+      case subtype do
+        :atom -> &is_atom/1
+        :tuple -> &is_tuple/1
+      end
+
+    if is_list(value) and Enum.all?(value, subtype_predicate) do
+      {:ok, value}
+    else
+      validation_error(:metadata, "a list of #{expected}", value)
+    end
+  end
+
+  def __validate_connection_name__(value) do
+    if is_binary(value) or value == :undefined do
+      {:ok, value}
+    else
+      {:error, "expected :name to be a string or the atom :undefined, got: #{inspect(value)}"}
+    end
   end
 
   defp validate_option(:bindings, value) when is_list(value) do
@@ -265,14 +300,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
           {:error, "the exchange in a binding should be a string, got: #{inspect(other)}"}
       end)
     end
-  end
-
-  defp validate_qos_opts(opts, supported_qos_options) do
-    qos_opts = opts[:qos] || []
-
-    qos_opts
-    |> Keyword.put_new(:prefetch_count, @default_prefetch_count)
-    |> validate_supported_opts(:qos, supported_qos_options)
   end
 
   defp validate_supported_opts(opts, group_name, supported_opts) do
