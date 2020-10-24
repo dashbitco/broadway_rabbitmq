@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.6.2 (2020-10-24)
 
   * Deprecate use of a default `:on_failure` option.
+  * Expose always-present `:amqp_channel` metadata containing the `AMQP.Channel`
+    struct.
 
 ## v0.6.1 (2020-06-05)
 
