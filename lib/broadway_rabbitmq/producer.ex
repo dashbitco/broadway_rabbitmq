@@ -214,7 +214,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
     * `:routing_key` - the name of the queue from which the message was consumed.
 
-    * `:message_count` - the current number of messages in the queue
+    * `:message_count` - the current number of messages in the queue.
 
     * `:content_type` - the MIME type of the message.
 
@@ -235,7 +235,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
     * `:timestamp` - a timestamp associated with the message.
 
-    * `:type` - message type as a string
+    * `:type` - message type as a string.
 
     * `:user_id` - a user identifier that could have been assigned during message publication.
     RabbitMQ validated this value against the active connection when the message was published.
@@ -243,6 +243,8 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:app_id` - publishing application identifier.
 
     * `:cluster_id` - RabbitMQ cluster identifier.
+
+    * `:reply_to` - name of the reply queue.
 
   """
 
