@@ -147,7 +147,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   test "raise an ArgumentError with proper message when backoff options are invalid" do
     assert_raise(
       ArgumentError,
-      "unknown type :unknown_type",
+      ~r/expected :backoff_type to be one of/,
       fn ->
         BroadwayRabbitMQ.Producer.init(
           queue: "test",

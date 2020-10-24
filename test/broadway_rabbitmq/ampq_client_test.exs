@@ -87,8 +87,11 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     end
 
     test "unsupported options for :connection" do
-      assert AmqpClient.init(queue: "queue", connection: [option_1: 1, option_2: 2]) ==
-               {:error, "Unsupported options [:option_1, :option_2] for :connection"}
+      assert {:error, message} =
+               AmqpClient.init(queue: "queue", connection: [option_1: 1, option_2: 2])
+
+      assert message =~ "unknown options [:option_1, :option_2], valid options are"
+      assert message =~ "in option :connection"
     end
 
     test "unsupported options for :qos" do
@@ -98,8 +101,11 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     end
 
     test "unsupported options for :declare" do
-      assert AmqpClient.init(queue: "queue", declare: [option_1: 1, option_2: 2]) ==
-               {:error, "Unsupported options [:option_1, :option_2] for :declare"}
+      assert {:error, message} =
+               AmqpClient.init(queue: "queue", declare: [option_1: 1, option_2: 2])
+
+      assert message =~ "unknown options [:option_1, :option_2]"
+      assert message =~ "in options [:declare]"
     end
 
     test ":queue is required" do
@@ -142,7 +148,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
       assert AmqpClient.init(queue: "queue", bindings: [:something, :else]) ==
                {:error,
-                "expected :bindings to be a list of bindings (keyword lists), got: [:something, :else]"}
+                "expected :bindings to be a list of bindings ({exchange, bind_options} tuples), got: :something"}
     end
 
     test ":merge_options options should be merged with normal opts" do
