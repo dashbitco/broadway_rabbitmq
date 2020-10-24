@@ -217,7 +217,10 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     )
 
     assert_receive {:message_handled, %Message{metadata: meta}, _}
-    assert meta == %{content_type: "FAKE_CONTENT_TYPE", routing_key: "FAKE_ROTING_KEY"}
+    assert map_size(meta) == 3
+
+    assert %{content_type: "FAKE_CONTENT_TYPE", routing_key: "FAKE_ROTING_KEY", amqp_channel: %{}} =
+             meta
   end
 
   test "forward messages delivered by the channel" do

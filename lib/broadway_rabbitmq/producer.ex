@@ -32,7 +32,9 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
        to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for
        random exponential (default: `:rand_exp`)
-    * `:metadata` - The list of AMQP metadata fields to copy (default: `[]`)
+    * `:metadata` - The list of AMQP metadata fields to copy (default: `[]`). Note
+      that every `Broadway.Message` contains an `:amqp_channel` in its `metadata` field.
+      See the "Metadata" section below.
     * `:declare` - Optional. A list of options used to declare the `:queue`. The
       queue is only declared (and possibly created if not already there) if this
       option is present and not `nil`. Note that if you use `""` as the queue
@@ -200,6 +202,13 @@ defmodule BroadwayRabbitMQ.Producer do
   This is useful in a handful of situations like when you are interested in the message headers
   or in knowing if the message is new or redelivered.
 
+  These are the keys in the metadata map that are *always present*:
+
+    * `:amqp_channel` - It contains the `AMQP.Channel` struct. You can use it to do things
+      like publish messages back to RabbitMQ (for use cases such as RPCs). You *should not*
+      do things with the channel other than publish messages with `AMQP.Basic.publish/5`. Other
+      operations may result in undesired effects.
+
   Here is the list of all possible values supported by `:metadata`:
 
     * `:delivery_tag` - an integer that uniquely identifies the delivery on a channel.
@@ -211,7 +220,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
     * `:routing_key` - the name of the queue from which the message was consumed.
 
-    * `:message_count` - the current number of messages in the queue
+    * `:message_count` - the current number of messages in the queue.
 
     * `:content_type` - the MIME type of the message.
 
@@ -232,7 +241,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
     * `:timestamp` - a timestamp associated with the message.
 
-    * `:type` - message type as a string
+    * `:type` - message type as a string.
 
     * `:user_id` - a user identifier that could have been assigned during message publication.
     RabbitMQ validated this value against the active connection when the message was published.
@@ -240,6 +249,8 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:app_id` - publishing application identifier.
 
     * `:cluster_id` - RabbitMQ cluster identifier.
+
+    * `:reply_to` - name of the reply queue.
 
   """
 
@@ -324,9 +335,14 @@ defmodule BroadwayRabbitMQ.Producer do
       on_failure: state.on_failure
     }
 
+    metadata =
+      meta
+      |> Map.take(config[:metadata])
+      |> Map.put(:amqp_channel, channel)
+
     message = %Message{
       data: payload,
-      metadata: Map.take(meta, config[:metadata]),
+      metadata: metadata,
       acknowledger: {__MODULE__, _ack_ref = channel, ack_data}
     }
 
