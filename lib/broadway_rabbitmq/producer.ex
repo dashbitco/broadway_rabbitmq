@@ -107,6 +107,7 @@ defmodule BroadwayRabbitMQ.Producer do
       to `exchange_name` through `AMQP.Queue.bind/4` using `binding_options` as
       the options. Bindings are idempotent so you can bind the same queue to the
       same exchange multiple times.
+  <<<<<<< HEAD
     * `:merge_options` - a function that takes the index of the producer in the
       Broadway topology and returns a keyword list of options. The returned options
       are merged with the other options given to the producer. This option is useful
