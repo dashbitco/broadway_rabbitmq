@@ -12,79 +12,80 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   @behaviour BroadwayRabbitMQ.RabbitmqClient
 
-  @default_prefetch_count 50
-  @supported_options [
-    :queue,
-    :connection,
-    :name,
-    :qos,
-    :backoff_min,
-    :backoff_max,
-    :backoff_type,
-    :metadata,
-    :declare,
-    :bindings,
-    :broadway,
-    :merge_options,
-    :after_connect
+  @connection_opts_schema [
+    username: [type: :any],
+    password: [type: :any],
+    virtual_host: [type: :any],
+    host: [type: :any],
+    port: [type: :any],
+    channel_max: [type: :any],
+    frame_max: [type: :any],
+    heartbeat: [type: :any],
+    connection_timeout: [type: :any],
+    ssl_options: [type: :any],
+    client_properties: [type: :any],
+    socket_options: [type: :any],
+    auth_mechanisms: [type: :any]
   ]
-  @supported_connection_options [
-    :username,
-    :password,
-    :virtual_host,
-    :host,
-    :port,
-    :channel_max,
-    :frame_max,
-    :heartbeat,
-    :connection_timeout,
-    :ssl_options,
-    :client_properties,
-    :socket_options,
-    :auth_mechanisms
+
+  @binding_opts_schema [
+    routing_key: [type: :any],
+    no_wait: [type: :any],
+    arguments: [type: :any]
   ]
-  @supported_declare_options [
-    :durable,
-    :auto_delete,
-    :exclusive,
-    :passive,
-    :no_wait,
-    :arguments
+
+  @opts_schema [
+    queue: [type: :string, required: true],
+    connection: [type: {:custom, __MODULE__, :__validate_connection_options__, []}, default: []],
+    name: [type: {:custom, __MODULE__, :__validate_connection_name__, []}, default: :undefined],
+    qos: [
+      type: :keyword_list,
+      keys: [
+        prefetch_size: [type: :non_neg_integer],
+        prefetch_count: [type: :non_neg_integer, default: 50]
+      ],
+      default: []
+    ],
+    backoff_min: [type: :non_neg_integer],
+    backoff_max: [type: :non_neg_integer],
+    backoff_type: [type: {:one_of, [:exp, :rand, :rand_exp, :stop]}],
+    metadata: [type: {:custom, __MODULE__, :__validate_metadata__, []}, default: []],
+    declare: [
+      type: :keyword_list,
+      keys: [
+        durable: [type: :any],
+        auto_delete: [type: :any],
+        exclusive: [type: :any],
+        passive: [type: :any],
+        no_wait: [type: :any],
+        arguments: [type: :any]
+      ]
+    ],
+    bindings: [type: {:custom, __MODULE__, :__validate_bindings__, []}, default: []],
+    broadway: [type: :any],
+    merge_options: [type: {:fun, 1}],
+    after_connect: [type: {:fun, 1}]
   ]
-  @support_qos_options [
-    :prefetch_size,
-    :prefetch_count
-  ]
-  @supported_bindings_options [
-    :routing_key,
-    :no_wait,
-    :arguments
-  ]
-  @default_metadata []
 
   @impl true
   def init(opts) do
     with {:ok, opts} <- validate_merge_opts(opts),
-         {:ok, opts} <- validate_supported_opts(opts, "Broadway", @supported_options),
-         {:ok, after_connect} <- validate(opts, :after_connect, fn _channel -> :ok end),
-         {:ok, metadata} <- validate(opts, :metadata, @default_metadata),
-         {:ok, name} <- validate(opts, :name, :undefined),
-         {:ok, queue} <- validate(opts, :queue),
-         {:ok, conn_opts} <- validate_conn_opts(opts, @supported_connection_options),
-         {:ok, declare_opts} <- validate_declare_opts(opts, queue, @supported_declare_options),
-         {:ok, bindings} <- validate_bindings(opts, @supported_bindings_options),
-         {:ok, qos_opts} <- validate_qos_opts(opts, @support_qos_options) do
+         {:ok, opts} <- NimbleOptions.validate(opts, @opts_schema),
+         :ok <- validate_declare_opts(opts[:declare], opts[:queue]) do
       {:ok,
        %{
-         connection: conn_opts,
-         queue: queue,
-         name: name,
-         declare_opts: declare_opts,
-         bindings: bindings,
-         qos: qos_opts,
-         metadata: metadata,
-         after_connect: after_connect
+         connection: Keyword.fetch!(opts, :connection),
+         queue: Keyword.fetch!(opts, :queue),
+         name: Keyword.fetch!(opts, :name),
+         declare_opts: Keyword.get(opts, :declare, nil),
+         bindings: Keyword.fetch!(opts, :bindings),
+         qos: Keyword.fetch!(opts, :qos),
+         metadata: Keyword.fetch!(opts, :metadata),
+         after_connect: Keyword.get(opts, :after_connect, fn _channel -> :ok end)
        }}
+    else
+      {:error, %NimbleOptions.ValidationError{} = error} -> {:error, Exception.message(error)}
+      {:error, message} when is_binary(message) -> {:error, message}
     end
   end
 
@@ -189,99 +190,75 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  defp validate(opts, key, default \\ nil) when is_list(opts) do
-    validate_option(key, opts[key] || default)
+  def __validate_metadata__(value) do
+    if is_list(value) and Enum.all?(value, &is_atom/1) do
+      {:ok, value}
+    else
+      {:error, "expected :metadata to be a list of atoms, got: #{inspect(value)}"}
+    end
   end
 
-  defp validate_option(:queue, value) when not is_binary(value),
-    do: validation_error(:queue, "a string", value)
-
-  defp validate_option(:connection, value) when not (is_binary(value) or is_list(value)),
-    do: validation_error(:connection, "a URI or a keyword list", value)
-
-  defp validate_option(:name, :undefined), do: {:ok, :undefined}
-
-  defp validate_option(:name, value) when not is_binary(value),
-    do: validation_error(:name, "a binary or :undefined atom", value)
-
-  defp validate_option(:metadata, value) when is_list(value) do
-    if Enum.all?(value, &is_atom/1),
-      do: {:ok, value},
-      else: validation_error(:metadata, "a list of atoms", value)
+  def __validate_connection_name__(value) do
+    if is_binary(value) or value == :undefined do
+      {:ok, value}
+    else
+      {:error, "expected :name to be a string or the atom :undefined, got: #{inspect(value)}"}
+    end
   end
 
-  defp validate_option(:bindings, value) when is_list(value) do
-    if Enum.all?(value, &is_tuple/1),
-      do: {:ok, value},
-      else: validation_error(:bindings, "a list of bindings (keyword lists)", value)
+  def __validate_connection_options__(uri) when is_binary(uri) do
+    case uri |> to_charlist() |> :amqp_uri.parse() do
+      {:ok, _amqp_params} -> {:ok, uri}
+      {:error, reason} -> {:error, "Failed parsing AMQP URI: #{inspect(reason)}"}
+    end
   end
 
-  defp validate_option(:after_connect, value) when not is_function(value, 1) do
-    validation_error(:after_connect, "a function that takes one argument", value)
+  def __validate_connection_options__(opts) when is_list(opts) do
+    with {:error, %NimbleOptions.ValidationError{} = error} <-
+           NimbleOptions.validate(opts, @connection_opts_schema),
+         do: {:error, Exception.message(error) <> " (in option :connection)"}
   end
 
-  defp validate_option(_, value), do: {:ok, value}
-
-  defp validation_error(option, expected, value) do
-    {:error, "expected #{inspect(option)} to be #{expected}, got: #{inspect(value)}"}
+  def __validate_connection_options__(other) do
+    {:error, "expected :connection to be a URI or a keyword list, got: #{inspect(other)}"}
   end
 
-  defp validate_conn_opts(opts, supported_opts) do
-    case Keyword.get(opts, :connection, []) do
-      uri when is_binary(uri) ->
-        case uri |> to_charlist() |> :amqp_uri.parse() do
-          {:ok, _amqp_params} -> {:ok, uri}
-          {:error, reason} -> {:error, "Failed parsing AMQP URI: #{inspect(reason)}"}
+  defp validate_declare_opts(declare_opts, queue) do
+    if queue == "" and is_nil(declare_opts) do
+      {:error, "can't use \"\" (server autogenerate) as the queue name without the :declare"}
+    else
+      :ok
+    end
+  end
+
+  def __validate_bindings__(value) when is_list(value) do
+    Enum.each(value, fn
+      {exchange, binding_opts} when is_binary(exchange) ->
+        case NimbleOptions.validate(binding_opts, @binding_opts_schema) do
+          {:ok, _bindings_opts} ->
+            :ok
+
+          {:error, %NimbleOptions.ValidationError{} = reason} ->
+            throw({:error, Exception.message(reason)})
         end
 
-      opts when is_list(opts) ->
-        validate_supported_opts(opts, _group = :connection, supported_opts)
-    end
+      {other, _opts} ->
+        throw({:error, "the exchange in a binding should be a string, got: #{inspect(other)}"})
+
+      other ->
+        message =
+          "expected :bindings to be a list of bindings ({exchange, bind_options} tuples), " <>
+            "got: #{inspect(other)}"
+
+        throw({:error, message})
+    end)
+
+    {:ok, value}
+  catch
+    :throw, {:error, message} -> {:error, message}
   end
 
-  defp validate_declare_opts(opts, queue, supported_declare_options) do
-    case Keyword.fetch(opts, :declare) do
-      :error when queue == "" ->
-        {:error, "can't use \"\" (server autogenerate) as the queue name without the :declare"}
-
-      :error ->
-        {:ok, nil}
-
-      {:ok, declare_opts} ->
-        validate_supported_opts(declare_opts, :declare, supported_declare_options)
-    end
-  end
-
-  defp validate_bindings(opts, supported_bindings_options) do
-    with {:ok, bindings} <- validate(opts, :bindings, _default = []) do
-      Enum.reduce_while(bindings, {:ok, bindings}, fn
-        {exchange, binding_opts}, acc when is_binary(exchange) ->
-          case validate_supported_opts(binding_opts, :bindings, supported_bindings_options) do
-            {:ok, _bindings_opts} -> {:cont, acc}
-            {:error, reason} -> {:halt, {:error, reason}}
-          end
-
-        {other, _opts}, _acc ->
-          {:error, "the exchange in a binding should be a string, got: #{inspect(other)}"}
-      end)
-    end
-  end
-
-  defp validate_qos_opts(opts, supported_qos_options) do
-    qos_opts = opts[:qos] || []
-
-    qos_opts
-    |> Keyword.put_new(:prefetch_count, @default_prefetch_count)
-    |> validate_supported_opts(:qos, supported_qos_options)
-  end
-
-  defp validate_supported_opts(opts, group_name, supported_opts) do
-    opts
-    |> Keyword.keys()
-    |> Enum.reject(fn k -> k in supported_opts end)
-    |> case do
-      [] -> {:ok, opts}
-      keys -> {:error, "Unsupported options #{inspect(keys)} for #{inspect(group_name)}"}
-    end
+  def __validate_bindings__(other) do
+    {:error, "expected bindings to be a list of {exchange, opts} tuples, got: #{inspect(other)}"}
   end
 end

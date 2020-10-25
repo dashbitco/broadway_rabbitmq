@@ -42,8 +42,8 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
       ]
 
       qos = [
-        prefetch_size: nil,
-        prefetch_count: nil
+        prefetch_size: 1,
+        prefetch_count: 1
       ]
 
       options = [
@@ -82,35 +82,43 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     end
 
     test "unsupported options for Broadway" do
-      assert AmqpClient.init(queue: "queue", option_1: 1, option_2: 2) ==
-               {:error, "Unsupported options [:option_1, :option_2] for \"Broadway\""}
+      assert {:error, message} = AmqpClient.init(queue: "queue", option_1: 1, option_2: 2)
+      assert message =~ "unknown options [:option_1, :option_2], valid options are"
     end
 
     test "unsupported options for :connection" do
-      assert AmqpClient.init(queue: "queue", connection: [option_1: 1, option_2: 2]) ==
-               {:error, "Unsupported options [:option_1, :option_2] for :connection"}
+      assert {:error, message} =
+               AmqpClient.init(queue: "queue", connection: [option_1: 1, option_2: 2])
+
+      assert message =~ "unknown options [:option_1, :option_2], valid options are"
+      assert message =~ "in option :connection"
     end
 
     test "unsupported options for :qos" do
-      assert AmqpClient.init(queue: "queue", qos: [option_1: 1, option_2: 2]) ==
-               {:error, "Unsupported options [:option_1, :option_2] for :qos"}
+      assert {:error, message} = AmqpClient.init(queue: "queue", qos: [option_1: 1, option_2: 2])
+      assert message =~ "unknown options [:option_1, :option_2]"
+      assert message =~ "in options [:qos]"
     end
 
     test "unsupported options for :declare" do
-      assert AmqpClient.init(queue: "queue", declare: [option_1: 1, option_2: 2]) ==
-               {:error, "Unsupported options [:option_1, :option_2] for :declare"}
+      assert {:error, message} =
+               AmqpClient.init(queue: "queue", declare: [option_1: 1, option_2: 2])
+
+      assert message =~ "unknown options [:option_1, :option_2]"
+      assert message =~ "in options [:declare]"
     end
 
     test ":queue is required" do
-      assert AmqpClient.init([]) == {:error, "expected :queue to be a string, got: nil"}
+      assert AmqpClient.init([]) ==
+               {:error, "required option :queue not found, received options: []"}
 
       assert AmqpClient.init(queue: nil) ==
-               {:error, "expected :queue to be a string, got: nil"}
+               {:error, "expected :queue to be an string, got: nil"}
     end
 
     test ":queue should be a string" do
       assert AmqpClient.init(queue: :an_atom) ==
-               {:error, "expected :queue to be a string, got: :an_atom"}
+               {:error, "expected :queue to be an string, got: :an_atom"}
 
       {:ok, config} = AmqpClient.init(queue: "my_queue")
       assert config.queue == "my_queue"
@@ -140,7 +148,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
       assert AmqpClient.init(queue: "queue", bindings: [:something, :else]) ==
                {:error,
-                "expected :bindings to be a list of bindings (keyword lists), got: [:something, :else]"}
+                "expected :bindings to be a list of bindings ({exchange, bind_options} tuples), got: :something"}
     end
 
     test ":merge_options options should be merged with normal opts" do
@@ -187,12 +195,14 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     test "options returned by :merge_options are still validated" do
       merge_options_fun = fn _index -> [option: 1] end
 
-      assert AmqpClient.init(
-               queue: "queue",
-               merge_options: merge_options_fun,
-               broadway: [index: 4]
-             ) ==
-               {:error, "Unsupported options [:option] for \"Broadway\""}
+      assert {:error, message} =
+               AmqpClient.init(
+                 queue: "queue",
+                 merge_options: merge_options_fun,
+                 broadway: [index: 4]
+               )
+
+      assert message =~ "unknown options [:option], valid options are"
     end
   end
 end

@@ -137,7 +137,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   test "raise an ArgumentError with proper message when client options are invalid" do
     assert_raise(
       ArgumentError,
-      "invalid options given to BroadwayRabbitMQ.AmqpClient.init/1, expected :queue to be a string, got: nil",
+      "invalid options given to BroadwayRabbitMQ.AmqpClient.init/1, expected :queue to be an string, got: nil",
       fn ->
         BroadwayRabbitMQ.Producer.init(queue: nil, on_failure: :reject_and_requeue)
       end
@@ -147,7 +147,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   test "raise an ArgumentError with proper message when backoff options are invalid" do
     assert_raise(
       ArgumentError,
-      "unknown type :unknown_type",
+      ~r/expected :backoff_type to be one of/,
       fn ->
         BroadwayRabbitMQ.Producer.init(
           queue: "test",
