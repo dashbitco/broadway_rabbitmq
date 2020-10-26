@@ -4,14 +4,13 @@ defmodule BroadwayRabbitMQ.Backoff do
 
   alias BroadwayRabbitMQ.Backoff
 
-  @default_type :rand_exp
   @min 1_000
   @max 30_000
 
   defstruct [:type, :min, :max, :state]
 
   def new(opts) do
-    case Keyword.get(opts, :backoff_type, @default_type) do
+    case Keyword.fetch!(opts, :backoff_type) do
       :stop ->
         nil
 
