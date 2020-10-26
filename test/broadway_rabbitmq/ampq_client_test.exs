@@ -204,5 +204,24 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
       assert message =~ "unknown options [:option], valid options are"
     end
+
+    test ":merge_options raises if there's no Broadway index in the options" do
+      merge_options_fun = fn _index -> [option: 1] end
+
+      assert_raise RuntimeError, "missing broadway index", fn ->
+        AmqpClient.init(
+          queue: "queue",
+          merge_options: merge_options_fun,
+          broadway: []
+        )
+      end
+
+      assert_raise RuntimeError, "missing broadway index", fn ->
+        AmqpClient.init(
+          queue: "queue",
+          merge_options: merge_options_fun
+        )
+      end
+    end
   end
 end

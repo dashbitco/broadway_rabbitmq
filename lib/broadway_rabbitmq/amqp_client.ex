@@ -56,8 +56,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     qos: [
       type: :keyword_list,
       keys: [
-        prefetch_size: [type: :non_neg_integer],
-        prefetch_count: [type: :non_neg_integer, default: 50]
+        prefetch_size: [type: :non_neg_integer, doc: "Foo"],
+        prefetch_count: [type: :non_neg_integer, default: 50, doc: "bar"]
       ],
       default: [],
       doc: """
@@ -106,12 +106,12 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     declare: [
       type: :keyword_list,
       keys: [
-        durable: [type: :any],
-        auto_delete: [type: :any],
-        exclusive: [type: :any],
-        passive: [type: :any],
-        no_wait: [type: :any],
-        arguments: [type: :any]
+        durable: [type: :any, doc: false],
+        auto_delete: [type: :any, doc: false],
+        exclusive: [type: :any, doc: false],
+        passive: [type: :any, doc: false],
+        no_wait: [type: :any, doc: false],
+        arguments: [type: :any, doc: false]
       ],
       doc: """
       A list of options used to declare the `:queue`. The
@@ -173,9 +173,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     broadway: [type: :any, doc: false]
   ]
 
-  def __opts_docs__ do
-    NimbleOptions.docs(@opts_schema)
-  end
+  @doc false
+  def __opts_schema__, do: @opts_schema
 
   @impl true
   def init(opts) do
