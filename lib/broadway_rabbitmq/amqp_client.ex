@@ -56,8 +56,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     qos: [
       type: :keyword_list,
       keys: [
-        prefetch_size: [type: :non_neg_integer, doc: "Foo"],
-        prefetch_count: [type: :non_neg_integer, default: 50, doc: "bar"]
+        prefetch_size: [type: :non_neg_integer],
+        prefetch_count: [type: :non_neg_integer, default: 50]
       ],
       default: [],
       doc: """
