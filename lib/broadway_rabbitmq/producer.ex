@@ -17,7 +17,7 @@ defmodule BroadwayRabbitMQ.Producer do
       """
     ],
     buffer_keep: [
-      type: :non_neg_integer,
+      type: {:one_of, [:first, :last]},
       doc: """
       Optional. Used in the GenStage producer configuration.
       Defines whether the `:first` or `:last` entries should be kept on the
@@ -43,6 +43,27 @@ defmodule BroadwayRabbitMQ.Producer do
       `Broadway.Message.configure_ack/2`.
       """,
       default: :reject_and_requeue
+    ],
+    backoff_min: [
+      type: :non_neg_integer,
+      doc: """
+      The minimum backoff interval (default: `1_000`).
+      """
+    ],
+    backoff_max: [
+      type: :non_neg_integer,
+      doc: """
+      The maximum backoff interval (default: `30_000`).
+      """
+    ],
+    backoff_type: [
+      type: {:one_of, [:rand_exp, :exp, :rand, :stop]},
+      default: :rand_exp,
+      doc: """
+      The backoff strategy: `:stop` for no backoff and
+      to stop, `:exp` for exponential, `:rand` for random, and `:rand_exp` for
+      random exponential (default: `:rand_exp`).
+      """
     ]
   ]
 
@@ -68,11 +89,6 @@ defmodule BroadwayRabbitMQ.Producer do
       See `AMQP.Basic.qos/2` for the full list of options. Pay attention that the
       `:global` option is not supported by Broadway since each producer holds only one
       channel per connection.
-    * `:backoff_min` - The minimum backoff interval (default: `1_000`)
-    * `:backoff_max` - The maximum backoff interval (default: `30_000`)
-    * `:backoff_type` - The backoff strategy, `:stop` for no backoff and
-       to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for
-       random exponential (default: `:rand_exp`)
     * `:metadata` - The list of AMQP metadata fields to copy (default: `[]`). Note
       that every `Broadway.Message` contains an `:amqp_channel` in its `metadata` field.
       See the "Metadata" section below.
@@ -304,17 +320,20 @@ defmodule BroadwayRabbitMQ.Producer do
     maybe_warn_unspecified_on_failure_opt(opts)
     {opts, client_opts} = Keyword.split(opts, Keyword.keys(@opts_schema))
 
-    opts = NimbleOptions.validate!(opts, @opts_schema)
+    opts =
+      case NimbleOptions.validate(opts, @opts_schema) do
+        {:ok, opts} -> opts
+        {:error, reason} -> raise ArgumentError, Exception.message(reason)
+      end
 
     client = Keyword.get(opts, :client, BroadwayRabbitMQ.AmqpClient)
     gen_stage_opts = Keyword.take(opts, [:buffer_size, :buffer_keep])
     on_success = Keyword.fetch!(opts, :on_success)
     on_failure = Keyword.fetch!(opts, :on_failure)
+    backoff_opts = Keyword.take(opts, [:backoff_min, :backoff_max, :backoff_type])
 
     config = init_client!(client, client_opts)
 
-    IO.inspect(client_opts, label: "client opts")
-    IO.inspect(opts, label: "opts")
     send(self(), {:connect, :no_init_client})
 
     prefetch_count = config[:qos][:prefetch_count]
@@ -326,7 +345,7 @@ defmodule BroadwayRabbitMQ.Producer do
        channel: nil,
        consumer_tag: nil,
        config: config,
-       backoff: Backoff.new(opts),
+       backoff: Backoff.new(backoff_opts),
        conn_ref: nil,
        channel_ref: nil,
        opts: client_opts,

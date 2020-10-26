@@ -46,9 +46,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       ],
       default: []
     ],
-    backoff_min: [type: :non_neg_integer],
-    backoff_max: [type: :non_neg_integer],
-    backoff_type: [type: {:one_of, [:exp, :rand, :rand_exp, :stop]}],
     metadata: [type: {:custom, __MODULE__, :__validate_metadata__, []}, default: []],
     declare: [
       type: :keyword_list,
