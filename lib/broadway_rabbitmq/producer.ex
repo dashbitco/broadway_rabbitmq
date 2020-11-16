@@ -447,7 +447,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
       [{msg, reason} | _other_failures] = failure_messages ->
         Enum.each(failure_messages, fn {msg, reason} ->
-          Logger.info("""
+          Logger.error("""
           Could not ack or reject message.
 
           Message: #{inspect(msg)}
