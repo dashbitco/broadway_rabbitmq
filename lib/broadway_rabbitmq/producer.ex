@@ -456,7 +456,7 @@ defmodule BroadwayRabbitMQ.Producer do
         end)
 
         raise RuntimeError, """
-        Could not ack or reject one or more messages. An example failure is provided. There may be more in logging above.
+        Could not ack or reject one or more messages. An example failure is provided. There may be more in logging.
 
         Message: #{inspect(msg)}
         Reason: #{inspect(reason)}
