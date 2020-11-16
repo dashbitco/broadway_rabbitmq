@@ -132,7 +132,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     @impl true
     def ack(_channel, :error_tuple) do
-      {:error, "Cannot acknowledge, with an error tuple"}
+      {:error, "Cannot acknowledge, error returned from amqp"}
     end
 
     @impl true
@@ -621,18 +621,29 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
       deliver_messages(broadway, [:fail_to_ack])
 
+      msgs =
+        Enum.map(["failure one", "failure two"], fn data ->
+          %Message{
+            data: data,
+            acknowledger:
+              {Producer, {self(), :ref},
+               %{
+                 client: FlakyRabbitmqClient,
+                 on_success: :ack,
+                 on_failure: :reject,
+                 delivery_tag: :error_tuple
+               }}
+          }
+        end)
+
+      ack_attempt = fn ->
+        Message.ack_immediately(msgs)
+      end
+
       assert_raise(RuntimeError, fn ->
-        Message.ack_immediately(%Message{
-          data: :fail_to_ack,
-          acknowledger:
-            {Producer, {self(), :ref},
-             %{
-               client: FlakyRabbitmqClient,
-               on_success: :ack,
-               on_failure: :reject,
-               delivery_tag: :error_tuple
-             }}
-        })
+        assert capture_log(ack_attempt) =~ "failure one"
+        assert capture_log(ack_attempt) =~ "failure two"
+        assert capture_log(ack_attempt) =~ "error returned from amqp"
       end)
     end
   end

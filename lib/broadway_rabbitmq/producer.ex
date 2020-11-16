@@ -445,9 +445,18 @@ defmodule BroadwayRabbitMQ.Producer do
       [] ->
         :ok
 
-      [{msg, reason} | _other_failures] ->
+      [{msg, reason} | _other_failures] = failure_messages ->
+        Enum.each(failure_messages, fn {msg, reason} ->
+          Logger.info("""
+          Could not ack or reject message.
+
+          Message: #{inspect(msg)}
+          Reason: #{inspect(reason)}
+          """)
+        end)
+
         raise RuntimeError, """
-        could not ack/reject message
+        Could not ack or reject one or more messages. An example failure is provided. There may be more in logging above.
 
         Message: #{inspect(msg)}
         Reason: #{inspect(reason)}
