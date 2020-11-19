@@ -3,7 +3,9 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   import ExUnit.CaptureLog
   import ExUnit.CaptureIO
+
   alias Broadway.Message
+  alias BroadwayRabbitMQ.Producer
 
   defmodule FakeChannel do
     use GenServer
@@ -65,6 +67,77 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     def ack(channel, delivery_tag) do
       GenServer.call(channel.pid, :fake_basic_ack)
       send(channel.test_pid, {:ack, delivery_tag})
+    end
+
+    @impl true
+    def reject(channel, delivery_tag, opts) do
+      GenServer.call(channel.pid, :fake_basic_ack)
+      send(channel.test_pid, {:reject, delivery_tag, opts})
+    end
+
+    @impl true
+    def consume(_channel, _config) do
+      :fake_consumer_tag
+    end
+
+    @impl true
+    def cancel(_channel, :fake_consumer_tag_closing) do
+      {:error, :closing}
+    end
+
+    @impl true
+    def cancel(%{test_pid: test_pid}, consumer_tag) do
+      send(test_pid, {:cancel, consumer_tag})
+      {:ok, consumer_tag}
+    end
+
+    @impl true
+    def close_connection(%{test_pid: test_pid}) do
+      send(test_pid, :connection_closed)
+      :ok
+    end
+  end
+
+  defmodule FlakyRabbitmqClient do
+    @behaviour BroadwayRabbitMQ.RabbitmqClient
+
+    @impl true
+    def init(opts) do
+      send(opts[:test_pid], :init_called)
+      {:ok, opts}
+    end
+
+    @impl true
+    def setup_channel(config) do
+      test_pid = config[:test_pid]
+
+      status =
+        Agent.get_and_update(config[:connection_agent], fn
+          [status | rest] ->
+            {status, rest}
+
+          _ ->
+            {:ok, []}
+        end)
+
+      if status == :ok do
+        channel = FakeChannel.new(test_pid)
+        send(test_pid, {:setup_channel, :ok, channel})
+        {:ok, channel}
+      else
+        send(test_pid, {:setup_channel, :error, nil})
+        {:error, :econnrefused}
+      end
+    end
+
+    @impl true
+    def ack(_channel, :error_tuple) do
+      {:error, "Cannot acknowledge, error returned from amqp"}
+    end
+
+    @impl true
+    def ack(_channel, _delivery_tag) do
+      raise "Cannot acknowledge"
     end
 
     @impl true
@@ -512,6 +585,69 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
   end
 
+  describe "unsuccessful acknowledgement" do
+    test "raise when an error is thrown acknowledging" do
+      {:ok, broadway} =
+        start_broadway(
+          client: FlakyRabbitmqClient,
+          on_success: :ack,
+          on_failure: :reject
+        )
+
+      deliver_messages(broadway, [:fail_to_ack])
+
+      assert_raise(RuntimeError, fn ->
+        Message.ack_immediately(%Message{
+          data: :fail_to_ack,
+          acknowledger:
+            {Producer, {self(), :ref},
+             %{
+               client: FlakyRabbitmqClient,
+               on_success: :ack,
+               on_failure: :reject,
+               delivery_tag: :unused
+             }}
+        })
+      end)
+    end
+
+    test "raise when an error is returned from amqp" do
+      {:ok, broadway} =
+        start_broadway(
+          client: FlakyRabbitmqClient,
+          on_success: :ack,
+          on_failure: :reject
+        )
+
+      deliver_messages(broadway, [:fail_to_ack])
+
+      msgs =
+        Enum.map(["failure one", "failure two"], fn data ->
+          %Message{
+            data: data,
+            acknowledger:
+              {Producer, {self(), :ref},
+               %{
+                 client: FlakyRabbitmqClient,
+                 on_success: :ack,
+                 on_failure: :reject,
+                 delivery_tag: :error_tuple
+               }}
+          }
+        end)
+
+      ack_attempt = fn ->
+        Message.ack_immediately(msgs)
+      end
+
+      assert_raise(RuntimeError, fn ->
+        assert capture_log(ack_attempt) =~ "failure one"
+        assert capture_log(ack_attempt) =~ "failure two"
+        assert capture_log(ack_attempt) =~ "error returned from amqp"
+      end)
+    end
+  end
+
   test "close connection on terminate" do
     {:ok, broadway} = start_broadway()
     assert_receive {:setup_channel, :ok, _channel}
@@ -526,6 +662,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     on_success = Keyword.get(opts, :on_success, :ack)
     on_failure = Keyword.get(opts, :on_failure, :reject)
     merge_options = Keyword.get(opts, :merge_options, fn _ -> [] end)
+    client = Keyword.get(opts, :client, FakeRabbitmqClient)
 
     {:ok, connection_agent} = Agent.start_link(fn -> connect_responses end)
 
@@ -535,7 +672,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       producer: [
         module:
           {BroadwayRabbitMQ.Producer,
-           client: FakeRabbitmqClient,
+           client: client,
            queue: "test",
            test_pid: self(),
            backoff_type: backoff_type,
