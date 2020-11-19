@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.3
+
+  * Start using nimble_options for validation. This has no practical
+    consequences on the API but introduces a new dependency in broadway_rabbitmq
+    (which was already used by Broadway).
+  * Raise if acking messages fails. See the discussion in
+    [dashbitco/broadway#208](https://github.com/dashbitco/broadway/issues/208).
+
 ## v0.6.2 (2020-10-24)
 
   * Deprecate use of a default `:on_failure` option.
