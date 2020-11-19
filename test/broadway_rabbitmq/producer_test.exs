@@ -67,12 +67,14 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     def ack(channel, delivery_tag) do
       GenServer.call(channel.pid, :fake_basic_ack)
       send(channel.test_pid, {:ack, delivery_tag})
+      :ok
     end
 
     @impl true
     def reject(channel, delivery_tag, opts) do
       GenServer.call(channel.pid, :fake_basic_ack)
       send(channel.test_pid, {:reject, delivery_tag, opts})
+      :ok
     end
 
     @impl true

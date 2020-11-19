@@ -433,30 +433,32 @@ defmodule BroadwayRabbitMQ.Producer do
   end
 
   defp ack_messages(messages, channel, kind) do
-    Enum.flat_map(messages, fn msg ->
-      {_module, _channel, ack_data} = msg.acknowledger
+    errors =
+      Enum.flat_map(messages, fn %{acknowledger: {_module, _channel, ack_data}} = msg ->
+        case apply_ack_func(kind, ack_data, channel) do
+          :ok ->
+            []
 
-      case apply_ack_func(kind, ack_data, channel) do
-        {:error, reason} -> [{msg, reason}]
-        _success -> []
-      end
-    end)
-    |> case do
+          {:error, reason} ->
+            Logger.error("""
+            Could not ack or reject message.
+
+            Message: #{inspect(msg)}
+            Reason: #{inspect(reason)}
+            """)
+
+            [{msg, reason}]
+        end
+      end)
+
+    case errors do
       [] ->
         :ok
 
-      [{msg, reason} | _other_failures] = failure_messages ->
-        Enum.each(failure_messages, fn {msg, reason} ->
-          Logger.error("""
-          Could not ack or reject message.
-
-          Message: #{inspect(msg)}
-          Reason: #{inspect(reason)}
-          """)
-        end)
-
+      [{msg, reason} | _other_errors] ->
         raise RuntimeError, """
-        Could not ack or reject one or more messages. An example failure is provided. There may be more in logging.
+        Could not ack or reject one or more messages. An example failure is provided. There may \
+        be more in logging.
 
         Message: #{inspect(msg)}
         Reason: #{inspect(reason)}
