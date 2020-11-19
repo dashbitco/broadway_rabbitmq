@@ -295,7 +295,6 @@ defmodule BroadwayRabbitMQ.Producer do
        consumer_tag: nil,
        config: config,
        backoff: Backoff.new(backoff_opts),
-       conn_ref: nil,
        channel_ref: nil,
        opts: client_opts,
        on_success: on_success,
@@ -350,13 +349,18 @@ defmodule BroadwayRabbitMQ.Producer do
     {:noreply, [message], state}
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, reason}, %{conn_ref: ref} = state) do
+  def handle_info({:EXIT, conn_pid, reason}, %{channel: %{conn: %{pid: conn_pid}}} = state) do
     Logger.warn("AMQP connection went down with reason: #{inspect(reason)}")
     {:noreply, [], connect(state, :init_client)}
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{channel_ref: ref} = state) do
     Logger.warn("AMQP channel went down with reason: #{inspect(reason)}")
+
+    # Make sure to close the connection in case it's still alive, because we reconnect and
+    # open a new one.
+    state.channel && state.client.close_connection(state.channel.conn)
+
     {:noreply, [], connect(state, :init_client)}
   end
 
@@ -498,10 +502,9 @@ defmodule BroadwayRabbitMQ.Producer do
         init_client!(client, opts)
       end
 
-    # TODO: Treat other setup errors properly
     case client.setup_channel(config) do
       {:ok, channel} ->
-        conn_ref = Process.monitor(channel.conn.pid)
+        # We monitor the channel but link to the connection (in the client, not here).
         channel_ref = Process.monitor(channel.pid)
         backoff = backoff && Backoff.reset(backoff)
         consumer_tag = client.consume(channel, config)
@@ -512,7 +515,6 @@ defmodule BroadwayRabbitMQ.Producer do
             config: config,
             consumer_tag: consumer_tag,
             backoff: backoff,
-            conn_ref: conn_ref,
             channel_ref: channel_ref
         }
 
@@ -523,6 +525,9 @@ defmodule BroadwayRabbitMQ.Producer do
 
   defp handle_connection_failure(state, reason) do
     _ = Logger.error("Cannot connect to RabbitMQ broker: #{inspect(reason)}")
+
+    # Make sure to close the connection in case it's still alive.
+    state.channel && state.client.close_connection(state.channel.conn)
 
     case reason do
       {:auth_failure, 'Disconnected'} ->
@@ -553,7 +558,6 @@ defmodule BroadwayRabbitMQ.Producer do
       | channel: nil,
         consumer_tag: nil,
         backoff: new_backoff,
-        conn_ref: nil,
         channel_ref: nil
     }
   end

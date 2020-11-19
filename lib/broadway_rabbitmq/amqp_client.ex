@@ -200,15 +200,39 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   @impl true
   def setup_channel(config) do
-    with {name, config} <- Map.pop(config, :name, :undefined),
-         {:ok, conn} <- Connection.open(config.connection, name),
-         {:ok, channel} <- Channel.open(conn),
-         :ok <- call_after_connect(config, channel),
-         :ok <- Basic.qos(channel, config.qos),
-         {:ok, queue} <- maybe_declare_queue(channel, config.queue, config.declare_opts),
-         :ok <- maybe_bind_queue(channel, queue, config.bindings) do
-      {:ok, channel}
+    {name, config} = Map.pop(config, :name, :undefined)
+
+    case Connection.open(config.connection, name) do
+      {:ok, conn} ->
+        true = Process.link(conn.pid)
+
+        with {:ok, channel} <- Channel.open(conn),
+             :ok <- call_after_connect(config, channel),
+             :ok <- Basic.qos(channel, config.qos),
+             {:ok, queue} <- maybe_declare_queue(channel, config.queue, config.declare_opts),
+             :ok <- maybe_bind_queue(channel, queue, config.bindings) do
+          {:ok, channel}
+        else
+          {:error, reason} ->
+            # We don't terminate the caller process when something fails, but just reconnect
+            # later. So if opening the connection works, but any other step fails (like opening
+            # the channel), we need to close the connection, or otherwise we would leave the
+            # connection open and leak it. In amqp_client, closing the connection also closes
+            # everything related to it (like the channel, so we're good).
+            _ = AMQP.Connection.close(conn)
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
+  catch
+    :exit, {:timeout, {:gen_server, :call, [amqp_conn_pid, :connect, timeout]}}
+    when is_integer(timeout) ->
+      # Make absolutely sure that this connection doesn't get established *after* the gen_server
+      # call timeout triggers and becomes a zombie connection.
+      true = Process.exit(amqp_conn_pid, :kill)
+      {:error, :timeout}
   end
 
   defp call_after_connect(config, channel) do
