@@ -113,12 +113,12 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
                {:error, "required option :queue not found, received options: []"}
 
       assert AmqpClient.init(queue: nil) ==
-               {:error, "expected :queue to be an string, got: nil"}
+               {:error, "expected :queue to be a string, got: nil"}
     end
 
     test ":queue should be a string" do
       assert AmqpClient.init(queue: :an_atom) ==
-               {:error, "expected :queue to be an string, got: :an_atom"}
+               {:error, "expected :queue to be a string, got: :an_atom"}
 
       {:ok, config} = AmqpClient.init(queue: "my_queue")
       assert config.queue == "my_queue"

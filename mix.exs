@@ -28,7 +28,7 @@ defmodule BroadwayRabbitMQ.MixProject do
     [
       {:broadway, "~> 0.6.0"},
       {:amqp, "~> 1.3"},
-      {:nimble_options, "~> 0.3.2"},
+      {:nimble_options, "~> 0.3.5"},
       {:ex_doc, ">= 0.19.0", only: :docs}
     ]
   end
