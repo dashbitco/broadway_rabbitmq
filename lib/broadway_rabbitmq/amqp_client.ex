@@ -87,7 +87,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       """
     ],
     backoff_type: [
-      type: {:one_of, [:exp, :rand, :rand_exp, :stop]},
+      type: {:in, [:exp, :rand, :rand_exp, :stop]},
       doc: """
       The backoff strategy. `:stop` for no backoff and
       to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for

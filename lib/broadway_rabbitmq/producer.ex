@@ -17,7 +17,7 @@ defmodule BroadwayRabbitMQ.Producer do
       """
     ],
     buffer_keep: [
-      type: {:one_of, [:first, :last]},
+      type: {:in, [:first, :last]},
       doc: """
       Optional. Used in the GenStage producer configuration.
       Defines whether the `:first` or `:last` entries should be kept on the
@@ -25,7 +25,7 @@ defmodule BroadwayRabbitMQ.Producer do
       """
     ],
     on_success: [
-      type: {:one_of, @valid_ack_values},
+      type: {:in, @valid_ack_values},
       doc: """
       Configures the acking behaviour for successful messages.
       See the "Acking" section below for all the possible values.
@@ -35,7 +35,7 @@ defmodule BroadwayRabbitMQ.Producer do
       default: :ack
     ],
     on_failure: [
-      type: {:one_of, @valid_ack_values},
+      type: {:in, @valid_ack_values},
       doc: """
       Configures the acking behaviour for failed messages.
       See the "Acking" section below for all the possible values.
@@ -57,7 +57,7 @@ defmodule BroadwayRabbitMQ.Producer do
       """
     ],
     backoff_type: [
-      type: {:one_of, [:rand_exp, :exp, :rand, :stop]},
+      type: {:in, [:rand_exp, :exp, :rand, :stop]},
       default: :rand_exp,
       doc: """
       The backoff strategy: `:stop` for no backoff and
