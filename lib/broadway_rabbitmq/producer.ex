@@ -295,7 +295,6 @@ defmodule BroadwayRabbitMQ.Producer do
        consumer_tag: nil,
        config: config,
        backoff: Backoff.new(backoff_opts),
-       conn_ref: nil,
        channel_ref: nil,
        opts: client_opts,
        on_success: on_success,
@@ -317,6 +316,7 @@ defmodule BroadwayRabbitMQ.Producer do
   # is consuming from gets deleted. See https://www.rabbitmq.com/consumer-cancel.html.
   def handle_info({:basic_cancel, %{consumer_tag: tag}}, %{consumer_tag: tag} = state) do
     Logger.warn("Received AMQP basic_cancel from RabbitMQ")
+    state = disconnect(state)
     {:noreply, [], connect(state, :init_client)}
   end
 
@@ -350,13 +350,14 @@ defmodule BroadwayRabbitMQ.Producer do
     {:noreply, [message], state}
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, reason}, %{conn_ref: ref} = state) do
+  def handle_info({:EXIT, conn_pid, reason}, %{channel: %{conn: %{pid: conn_pid}}} = state) do
     Logger.warn("AMQP connection went down with reason: #{inspect(reason)}")
     {:noreply, [], connect(state, :init_client)}
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{channel_ref: ref} = state) do
     Logger.warn("AMQP channel went down with reason: #{inspect(reason)}")
+    state = disconnect(state)
     {:noreply, [], connect(state, :init_client)}
   end
 
@@ -370,12 +371,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
   @impl true
   def terminate(_reason, state) do
-    %{client: client, channel: channel} = state
-
-    if channel do
-      client.close_connection(channel.conn)
-    end
-
+    _state = disconnect(state)
     :ok
   end
 
@@ -488,6 +484,15 @@ defmodule BroadwayRabbitMQ.Producer do
   defp requeue?(:reject_and_requeue, _redelivered), do: true
   defp requeue?(:reject_and_requeue_once, redelivered), do: !redelivered
 
+  defp disconnect(%{channel: channel, client: client} = state) do
+    if channel do
+      _ = client.close_connection(channel.conn)
+      %{state | channel: nil}
+    else
+      state
+    end
+  end
+
   defp connect(state, mode) when mode in [:init_client, :no_init_client] do
     %{client: client, config: config, backoff: backoff, opts: opts} = state
 
@@ -498,10 +503,9 @@ defmodule BroadwayRabbitMQ.Producer do
         init_client!(client, opts)
       end
 
-    # TODO: Treat other setup errors properly
     case client.setup_channel(config) do
       {:ok, channel} ->
-        conn_ref = Process.monitor(channel.conn.pid)
+        # We monitor the channel but link to the connection (in the client, not here).
         channel_ref = Process.monitor(channel.pid)
         backoff = backoff && Backoff.reset(backoff)
         consumer_tag = client.consume(channel, config)
@@ -512,7 +516,6 @@ defmodule BroadwayRabbitMQ.Producer do
             config: config,
             consumer_tag: consumer_tag,
             backoff: backoff,
-            conn_ref: conn_ref,
             channel_ref: channel_ref
         }
 
@@ -553,7 +556,6 @@ defmodule BroadwayRabbitMQ.Producer do
       | channel: nil,
         consumer_tag: nil,
         backoff: new_backoff,
-        conn_ref: nil,
         channel_ref: nil
     }
   end

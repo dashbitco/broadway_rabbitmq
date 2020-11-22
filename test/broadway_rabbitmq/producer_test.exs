@@ -12,6 +12,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     def new(test_pid) do
       fake_connection_pid = spawn(fn -> Process.sleep(:infinity) end)
+      true = Process.link(fake_connection_pid)
       {:ok, fake_channel_pid} = GenServer.start(__MODULE__, fake_connection_pid)
 
       %{
@@ -654,6 +655,33 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     {:ok, broadway} = start_broadway()
     assert_receive {:setup_channel, :ok, _channel}
     Process.exit(broadway, :shutdown)
+    assert_receive :connection_closed
+  end
+
+  test "if connection goes down, we reconnect" do
+    {:ok, _broadway} = start_broadway()
+    assert_receive {:setup_channel, :ok, channel}
+
+    assert capture_log(fn ->
+             Process.exit(channel.conn.pid, :shutdown)
+             assert_receive {:setup_channel, :ok, new_channel}
+             assert new_channel.pid != channel.pid
+           end) =~ "AMQP connection went down with reason: :shutdown"
+  end
+
+  test "if channel goes down, we close the connection before reconnecting" do
+    {:ok, _broadway} = start_broadway()
+    assert_receive {:setup_channel, :ok, channel}
+
+    Process.exit(channel.pid, :shutdown)
+    assert_receive :connection_closed
+  end
+
+  test "if producer gets an AMQP basic_cancel, we disconnect" do
+    {:ok, broadway} = start_broadway()
+    producer = Broadway.producer_names(broadway) |> Enum.random()
+    assert_receive {:setup_channel, :ok, _channel}
+    send(producer, {:basic_cancel, %{consumer_tag: :fake_consumer_tag}})
     assert_receive :connection_closed
   end
 
