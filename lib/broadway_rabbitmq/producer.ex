@@ -316,6 +316,7 @@ defmodule BroadwayRabbitMQ.Producer do
   # is consuming from gets deleted. See https://www.rabbitmq.com/consumer-cancel.html.
   def handle_info({:basic_cancel, %{consumer_tag: tag}}, %{consumer_tag: tag} = state) do
     Logger.warn("Received AMQP basic_cancel from RabbitMQ")
+    state = disconnect(state)
     {:noreply, [], connect(state, :init_client)}
   end
 
@@ -356,11 +357,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{channel_ref: ref} = state) do
     Logger.warn("AMQP channel went down with reason: #{inspect(reason)}")
-
-    # Make sure to close the connection in case it's still alive, because we reconnect and
-    # open a new one.
-    state.channel && state.client.close_connection(state.channel.conn)
-
+    state = disconnect(state)
     {:noreply, [], connect(state, :init_client)}
   end
 
@@ -374,12 +371,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
   @impl true
   def terminate(_reason, state) do
-    %{client: client, channel: channel} = state
-
-    if channel do
-      client.close_connection(channel.conn)
-    end
-
+    _state = disconnect(state)
     :ok
   end
 
@@ -492,6 +484,15 @@ defmodule BroadwayRabbitMQ.Producer do
   defp requeue?(:reject_and_requeue, _redelivered), do: true
   defp requeue?(:reject_and_requeue_once, redelivered), do: !redelivered
 
+  defp disconnect(%{channel: channel, client: client} = state) do
+    if channel do
+      _ = client.close_connection(channel.conn)
+      %{state | channel: nil}
+    else
+      state
+    end
+  end
+
   defp connect(state, mode) when mode in [:init_client, :no_init_client] do
     %{client: client, config: config, backoff: backoff, opts: opts} = state
 
@@ -525,9 +526,6 @@ defmodule BroadwayRabbitMQ.Producer do
 
   defp handle_connection_failure(state, reason) do
     _ = Logger.error("Cannot connect to RabbitMQ broker: #{inspect(reason)}")
-
-    # Make sure to close the connection in case it's still alive.
-    state.channel && state.client.close_connection(state.channel.conn)
 
     case reason do
       {:auth_failure, 'Disconnected'} ->

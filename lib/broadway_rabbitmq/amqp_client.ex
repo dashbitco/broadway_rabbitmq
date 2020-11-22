@@ -198,12 +198,18 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
+  # This function should return "{:ok, channel}" if successful. If failing to setup a channel, a
+  # connection, or if some network error happens at any point, this should close the connection it
+  # opened.
   @impl true
   def setup_channel(config) do
     {name, config} = Map.pop(config, :name, :undefined)
 
     case Connection.open(config.connection, name) do
       {:ok, conn} ->
+        # We need to link so that if our process crashes, the AMQP connection will go
+        # down. We're trapping exits in the producer anyways so on our end this looks
+        # like a monitor, pretty much.
         true = Process.link(conn.pid)
 
         with {:ok, channel} <- Channel.open(conn),
@@ -219,7 +225,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
             # the channel), we need to close the connection, or otherwise we would leave the
             # connection open and leak it. In amqp_client, closing the connection also closes
             # everything related to it (like the channel, so we're good).
-            _ = AMQP.Connection.close(conn)
+            _ = Connection.close(conn)
             {:error, reason}
         end
 
