@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.4
+
+  * Bump nimble_options dependency to 0.3.5 which fixes some deprecation
+    warnings.
+
+  * Fix a few potential RabbitMQ issues like possible connection leaking (see
+    [#83](https://github.com/dashbitco/broadway_rabbitmq/pull/83)).
+
 ## v0.6.3
 
   * Start using nimble_options for validation. This has no practical
