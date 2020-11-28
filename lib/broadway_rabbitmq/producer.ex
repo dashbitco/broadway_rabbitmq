@@ -416,6 +416,13 @@ defmodule BroadwayRabbitMQ.Producer do
     end
   end
 
+  @impl Producer
+  def prepare_for_start(_module, broadway_options) do
+    {__MODULE__, producer_options} = broadway_options[:producer][:module]
+    children = [{BroadwayRabbitMQ.AMQPConnectionPool, {producer_options, broadway_options[:name]}]
+    {children, broadway_options}
+  end
+
   defp producer_options(opts, 0) do
     if opts[:buffer_size] do
       opts
