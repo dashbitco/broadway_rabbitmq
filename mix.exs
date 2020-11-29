@@ -14,7 +14,8 @@ defmodule BroadwayRabbitMQ.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       docs: docs(),
-      package: package()
+      package: package(),
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -29,7 +30,8 @@ defmodule BroadwayRabbitMQ.MixProject do
       {:broadway, "~> 0.6.0"},
       {:amqp, "~> 1.3"},
       {:nimble_options, "~> 0.3.5"},
-      {:ex_doc, ">= 0.19.0", only: :docs}
+      {:ex_doc, ">= 0.19.0", only: :docs},
+      {:excoveralls, "~> 0.13.3", only: :test}
     ]
   end
 
