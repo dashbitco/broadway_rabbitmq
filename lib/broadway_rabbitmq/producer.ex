@@ -75,6 +75,9 @@ defmodule BroadwayRabbitMQ.Producer do
     * Automatically acknowledges/rejects messages.
     * Handles connection outages using backoff for retries.
 
+  For a quick getting started on using Broadway with RabbitMQ, please see
+  the [RabbitMQ Guide](https://hexdocs.pm/broadway/rabbitmq.html).
+
   ## Options
 
   #{NimbleOptions.docs(@opts_schema)}
