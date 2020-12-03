@@ -205,7 +205,11 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   def setup_channel(config) do
     {name, config} = Map.pop(config, :name, :undefined)
 
-    case Connection.open(config.connection, name) do
+    telemetry_meta = %{connection: config.connection, connection_name: name}
+
+    case :telemetry.span([:broadway_rabbitmq, :amqp, :open_connection], telemetry_meta, fn ->
+           {Connection.open(config.connection, name), telemetry_meta}
+         end) do
       {:ok, conn} ->
         # We need to link so that if our process crashes, the AMQP connection will go
         # down. We're trapping exits in the producer anyways so on our end this looks
@@ -277,12 +281,16 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   @impl true
   def ack(channel, delivery_tag) do
-    Basic.ack(channel, delivery_tag)
+    :telemetry.span([:broadway_rabbitmq, :amqp, :ack], _meta = %{}, fn ->
+      {Basic.ack(channel, delivery_tag), _meta = %{}}
+    end)
   end
 
   @impl true
   def reject(channel, delivery_tag, opts) do
-    Basic.reject(channel, delivery_tag, opts)
+    :telemetry.span([:broadway_rabbitmq, :amqp, :reject], %{requeue: opts[:requeue]}, fn ->
+      {Basic.reject(channel, delivery_tag, opts), _meta = %{}}
+    end)
   end
 
   @impl true
