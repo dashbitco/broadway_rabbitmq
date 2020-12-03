@@ -30,7 +30,7 @@ defmodule BroadwayRabbitMQ.MixProject do
       {:broadway, "~> 0.6.0"},
       {:amqp, "~> 1.3"},
       {:nimble_options, "~> 0.3.5"},
-      {:telemetry, "~> 0.4"},
+      {:telemetry, ">= 0.4.2 and < 1.0.0"},
       {:ex_doc, ">= 0.19.0", only: :docs},
       {:excoveralls, "~> 0.13.3", only: :test}
     ]
