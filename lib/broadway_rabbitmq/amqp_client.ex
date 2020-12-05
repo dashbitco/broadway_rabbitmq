@@ -45,7 +45,12 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       """
     ],
     connection: [
-      type: {:custom, __MODULE__, :__validate_connection_options__, []},
+      type:
+        {:or,
+         [
+           {:custom, __MODULE__, :__validate_amqp_uri__, []},
+           keyword_list: @connection_opts_schema
+         ]},
       default: [],
       doc: """
       Defines an AMQP URI or a set of options used by
@@ -68,7 +73,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       """
     ],
     name: [
-      type: {:custom, __MODULE__, :__validate_connection_name__, []},
+      type: {:or, [:string, {:in, [:undefined]}]},
       default: :undefined,
       doc: """
       The name of the AMQP connection to use.
@@ -95,7 +100,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       """
     ],
     metadata: [
-      type: {:custom, __MODULE__, :__validate_metadata__, []},
+      type: {:list, :atom},
       default: [],
       doc: """
       The list of AMQP metadata fields to copy (default: `[]`). Note
@@ -126,7 +131,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       """
     ],
     bindings: [
-      type: {:custom, __MODULE__, :__validate_bindings__, []},
+      type: {:list, {:custom, __MODULE__, :__validate_binding__, []}},
       default: [],
       doc: """
       A list of bindings for the `:queue`. This option
@@ -337,37 +342,11 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  def __validate_metadata__(value) do
-    if is_list(value) and Enum.all?(value, &is_atom/1) do
-      {:ok, value}
-    else
-      {:error, "expected :metadata to be a list of atoms, got: #{inspect(value)}"}
-    end
-  end
-
-  def __validate_connection_name__(value) do
-    if is_binary(value) or value == :undefined do
-      {:ok, value}
-    else
-      {:error, "expected :name to be a string or the atom :undefined, got: #{inspect(value)}"}
-    end
-  end
-
-  def __validate_connection_options__(uri) when is_binary(uri) do
+  def __validate_amqp_uri__(uri) do
     case uri |> to_charlist() |> :amqp_uri.parse() do
       {:ok, _amqp_params} -> {:ok, uri}
-      {:error, reason} -> {:error, "Failed parsing AMQP URI: #{inspect(reason)}"}
+      {:error, reason} -> {:error, "failed parsing AMQP URI: #{inspect(reason)}"}
     end
-  end
-
-  def __validate_connection_options__(opts) when is_list(opts) do
-    with {:error, %NimbleOptions.ValidationError{} = error} <-
-           NimbleOptions.validate(opts, @connection_opts_schema),
-         do: {:error, Exception.message(error) <> " (in option :connection)"}
-  end
-
-  def __validate_connection_options__(other) do
-    {:error, "expected :connection to be a URI or a keyword list, got: #{inspect(other)}"}
   end
 
   defp validate_declare_opts(declare_opts, queue) do
@@ -378,34 +357,14 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  def __validate_bindings__(value) when is_list(value) do
-    Enum.each(value, fn
-      {exchange, binding_opts} when is_binary(exchange) ->
-        case NimbleOptions.validate(binding_opts, @binding_opts_schema) do
-          {:ok, _bindings_opts} ->
-            :ok
-
-          {:error, %NimbleOptions.ValidationError{} = reason} ->
-            throw({:error, Exception.message(reason)})
-        end
-
-      {other, _opts} ->
-        throw({:error, "the exchange in a binding should be a string, got: #{inspect(other)}"})
-
-      other ->
-        message =
-          "expected :bindings to be a list of bindings ({exchange, bind_options} tuples), " <>
-            "got: #{inspect(other)}"
-
-        throw({:error, message})
-    end)
-
-    {:ok, value}
-  catch
-    :throw, {:error, message} -> {:error, message}
+  def __validate_binding__({exchange, binding_opts}) when is_binary(exchange) do
+    case NimbleOptions.validate(binding_opts, @binding_opts_schema) do
+      {:ok, validated_binding_opts} -> {:ok, {exchange, validated_binding_opts}}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
-  def __validate_bindings__(other) do
-    {:error, "expected bindings to be a list of {exchange, opts} tuples, got: #{inspect(other)}"}
+  def __validate_binding__(other) do
+    {:error, "expected binding to be a {exchange, opts} tuple, got: #{inspect(other)}"}
   end
 end

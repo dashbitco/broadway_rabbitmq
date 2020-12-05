@@ -77,8 +77,8 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     end
 
     test "invalid URI" do
-      assert {:error, "Failed parsing AMQP URI: " <> _} =
-               AmqpClient.init(queue: "queue", connection: "http://example.com")
+      assert {:error, message} = AmqpClient.init(queue: "queue", connection: "http://example.com")
+      assert message =~ "failed parsing AMQP URI"
     end
 
     test "unsupported options for Broadway" do
@@ -91,7 +91,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
                AmqpClient.init(queue: "queue", connection: [option_1: 1, option_2: 2])
 
       assert message =~ "unknown options [:option_1, :option_2], valid options are"
-      assert message =~ "in option :connection"
+      assert message =~ "in options [:connection]"
     end
 
     test "unsupported options for :qos" do
@@ -137,18 +137,24 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
       {:ok, opts} = AmqpClient.init(queue: "queue", metadata: [:routing_key, :headers])
       assert opts[:metadata] == [:routing_key, :headers]
 
+      message =
+        ~s(list element at position 0 in :metadata failed validation: expected "list element" ) <>
+          ~s(to be an atom, got: "routing_key")
+
       assert AmqpClient.init(queue: "queue", metadata: ["routing_key", :headers]) ==
-               {:error,
-                "expected :metadata to be a list of atoms, got: [\"routing_key\", :headers]"}
+               {:error, message}
     end
 
     test ":bindings should be a list of tuples" do
       {:ok, opts} = AmqpClient.init(queue: "queue", bindings: [{"my-exchange", [no_wait: true]}])
       assert opts[:bindings] == [{"my-exchange", [no_wait: true]}]
 
+      message =
+        ~s(list element at position 0 in :bindings failed validation: expected binding to be ) <>
+          ~s(a {exchange, opts} tuple, got: :something)
+
       assert AmqpClient.init(queue: "queue", bindings: [:something, :else]) ==
-               {:error,
-                "expected :bindings to be a list of bindings ({exchange, bind_options} tuples), got: :something"}
+               {:error, message}
     end
 
     test ":merge_options options should be merged with normal opts" do
