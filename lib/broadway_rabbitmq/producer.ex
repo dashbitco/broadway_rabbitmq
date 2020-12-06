@@ -165,43 +165,67 @@ defmodule BroadwayRabbitMQ.Producer do
   are acked on RabbitMQ. By default, successful messages are acked and failed
   messages are rejected. You can set `:on_success` and `:on_failure` when starting
   the RabbitMQ producer, or change them for each message through
-  `Broadway.Message.configure_ack/2`.
+  `Broadway.Message.configure_ack/2`. You can also ack a message *before* the end of the Broadway
+  pipeline by using `Broadway.Message.ack_immediately/1`, which determines whether to ack or
+  reject based on `:on_success`/`:on_failure` too.
 
   Here is the list of all possible values supported by `:on_success` and `:on_failure`:
 
     * `:ack` - acknowledge the message. RabbitMQ will mark the message as acked and
-      will not redeliver it to any other consumer.
+      will not redeliver it to any other consumer. This is done via `AMQP.Basic.ack/3`.
 
     * `:reject` - rejects the message without requeuing (basically, discards
        the message).  RabbitMQ will not redeliver the message to any other
        consumer, but a queue can be configured to send rejected messages to a
        [dead letter exchange](https://www.rabbitmq.com/dlx.html), where another
-       consumer can see why it was dead lettered, how many times, etc, and
-       potentially republish it.
+       consumer can see why it was dead lettered, how many times, and so on, and
+       potentially republish it. Rejecting is done through `AMQP.Basic.reject/3`
+       with the `:requeue` option set to `false`.
 
     * `:reject_and_requeue` - rejects the message and tells RabbitMQ to requeue it so
       that it can be delivered to a consumer again. `:reject_and_requeue`
       always requeues the message. If the message is unprocessable, this will
-      cause an infinite loop of retries.
+      cause an infinite loop of retries. Rejecting is done through `AMQP.Basic.reject/3`
+       with the `:requeue` option set to `true`.
 
     * `:reject_and_requeue_once` - rejects the message and tells RabbitMQ to requeue it
       the first time. If a message was already requeued and redelivered, it will be
       rejected and not requeued again. This feature uses Broadway-specific message metadata,
-      not RabbitMQ's dead lettering feature.
+      not RabbitMQ's dead lettering feature. Rejecting is done through `AMQP.Basic.reject/3`.
 
-  > Note: choose the requeue strategy carefully. If you set the value to `:reject`
-  or `:reject_and_requeue_once`, make sure you handle failed messages properly, either by logging
-  them somewhere or redirecting them to a dead-letter queue for future inspection.
-  By sticking with `:reject_and_requeue`, pay attention that requeued messages by default will
+  ### Choosing the right requeue strategy
+
+  Choose the requeue strategy carefully.
+
+  If you set the value to `:reject` or `:reject_and_requeue_once`, make sure you handle failed
+  messages properly, either by logging them somewhere or redirecting them to a dead-letter queue
+  for future inspection. These strategies are useful when you want to implement **at most once**
+  processing: you want your messages to be processed at most once, but if they fail, you prefer
+  that they're not re-processed. It's common to pair this requeue strategy with the use of
+  `Broadway.Message.ack_immediately/1` in order to ack the message before doing any work,
+  so that if the consumer loses connection to RabbitMQ while processing, the message will have
+  been acked and RabbitMQ will not deliver it to another consumer. For example:
+
+      def handle_message(_, message, _context) do
+        Broadway.Message.ack_immediately(message)
+        process_message(message)
+        message
+      end
+
+  `:reject_and_requeue` is commonly used when you are implementing **at least once** processing
+  semantics. You want messages to be processed at least once, so if something goes wrong and they
+  get rejected, they'll be requeued and redelivered to a consumer.
+  When using `:reject_and_requeue`, pay attention that requeued messages by default will
   be instantly redelivered, which may result in very high unnecessary workload.
   One way to handle this is by using [Dead Letter Exchanges](https://www.rabbitmq.com/dlx.html)
   and [TTL and Expiration](https://www.rabbitmq.com/ttl.html).
 
   ## Metadata
 
-  You can retrieve additional information about your message by setting the `:metadata` option.
-  This is useful in a handful of situations like when you are interested in the message headers
-  or in knowing if the message is new or redelivered.
+  You can retrieve additional information about your message by setting the `:metadata` option
+  when starting the producer. This is useful in a handful of situations like when you are
+  interested in the message headers or in knowing if the message is new or redelivered.
+  Metadata is added to the `metadata` field in the `Broadway.Message` struct.
 
   These are the keys in the metadata map that are *always present*:
 
@@ -228,15 +252,17 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:content_encoding` - the MIME content encoding of the message.
 
     * `:headers` - the headers of the message, which are returned in tuples of type
-    {String.t(), argument_type(), term()}. The last value of the tuple is the value of the header.
-    You can find a list of argument types [here](https://hexdocs.pm/amqp/readme.html#types-of-arguments-and-headers).
+      `{String.t(), argument_type(), term()}`. The last value of the tuple is the value of
+      the header. You can find a list of argument types
+      [here](https://hexdocs.pm/amqp/readme.html#types-of-arguments-and-headers).
 
     * `:persistent` - a boolean stating whether or not the message was published with disk persistence.
 
     * `:priority` - an integer representing the message priority on the queue.
 
     * `:correlation_id` - it's a useful property of AMQP protocol to correlate RPC requests.
-    You can read more about RPC in RabbitMQ [here](https://www.rabbitmq.com/tutorials/tutorial-six-python.html).
+      You can read more about RPC in RabbitMQ
+      [here](https://www.rabbitmq.com/tutorials/tutorial-six-python.html).
 
     * `:message_id` - application specific message identifier.
 
@@ -245,7 +271,7 @@ defmodule BroadwayRabbitMQ.Producer do
     * `:type` - message type as a string.
 
     * `:user_id` - a user identifier that could have been assigned during message publication.
-    RabbitMQ validated this value against the active connection when the message was published.
+      RabbitMQ validated this value against the active connection when the message was published.
 
     * `:app_id` - publishing application identifier.
 
