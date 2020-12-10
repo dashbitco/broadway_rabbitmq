@@ -129,14 +129,6 @@ defmodule BroadwayRabbitMQ.Producer do
   the producer will try to reconnect using an exponential random backoff strategy.
   The strategy can be configured using the `:backoff_type` option.
 
-  ## Unsupported options
-
-  Currently, Broadway does not accept options for `Basic.consume/4` which
-  is called internally by the producer with default values. That means options
-  like `:no_ack` are not supported. If you have a scenario where you need to
-  customize those options, please open an issue, so we can consider adding this
-  feature.
-
   ## Declaring queues and binding them to exchanges
 
   In RabbitMQ, it's common for consumers to declare the queue they're going
@@ -192,6 +184,10 @@ defmodule BroadwayRabbitMQ.Producer do
       the first time. If a message was already requeued and redelivered, it will be
       rejected and not requeued again. This feature uses Broadway-specific message metadata,
       not RabbitMQ's dead lettering feature. Rejecting is done through `AMQP.Basic.reject/3`.
+
+  If you pass the `no_ack: true` option under `:consume_options`, then RabbitMQ will consider
+  every message delivered to a consumer as **acked**, so the settings above have no effect.
+  In those cases, calling `Broadway.Message.ack_immediately/1` also has no effect.
 
   ### Choosing the right requeue strategy
 
@@ -357,13 +353,20 @@ defmodule BroadwayRabbitMQ.Producer do
     %{channel: channel, client: client, config: config} = state
     %{delivery_tag: tag, redelivered: redelivered} = meta
 
-    ack_data = %{
-      delivery_tag: tag,
-      client: client,
-      redelivered: redelivered,
-      on_success: state.on_success,
-      on_failure: state.on_failure
-    }
+    acknowledger =
+      if config[:consume_options][:no_ack] do
+        {Broadway.NoopAcknowledger, _ack_ref = nil, _data = nil}
+      else
+        ack_data = %{
+          delivery_tag: tag,
+          client: client,
+          redelivered: redelivered,
+          on_success: state.on_success,
+          on_failure: state.on_failure
+        }
+
+        {__MODULE__, _ack_ref = channel, ack_data}
+      end
 
     metadata =
       meta
@@ -373,7 +376,7 @@ defmodule BroadwayRabbitMQ.Producer do
     message = %Message{
       data: payload,
       metadata: metadata,
-      acknowledger: {__MODULE__, _ack_ref = channel, ack_data}
+      acknowledger: acknowledger
     }
 
     {:noreply, [message], state}

@@ -421,6 +421,17 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
   end
 
+  @tag :focus
+  test "if the :no_ack consume option is true, the acknowledger is set to NoopAcknowledger" do
+    {:ok, broadway} = start_broadway(consume_options: [no_ack: true])
+    assert_receive {:setup_channel, :ok, _}
+
+    deliver_messages(broadway, [1])
+
+    assert_receive {:message_handled, %Broadway.Message{} = message, _channel}
+    assert message.acknowledger == {Broadway.NoopAcknowledger, nil, nil}
+  end
+
   describe "prepare_for_draining" do
     test "cancel consumer and keep the current state" do
       channel = FakeChannel.new(self())
@@ -693,6 +704,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     on_failure = Keyword.get(opts, :on_failure, :reject)
     merge_options = Keyword.get(opts, :merge_options, fn _ -> [] end)
     client = Keyword.get(opts, :client, FakeRabbitmqClient)
+    consume_options = Keyword.get(opts, :consume_options, [])
 
     {:ok, connection_agent} = Agent.start_link(fn -> connect_responses end)
 
@@ -711,6 +723,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
            connection_agent: connection_agent,
            qos: [prefetch_count: 10],
            metadata: metadata,
+           consume_options: consume_options,
            on_success: on_success,
            on_failure: on_failure,
            merge_options: merge_options},
