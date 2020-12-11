@@ -50,7 +50,8 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
         queue: "queue",
         connection: connection,
         qos: qos,
-        after_connect: after_connect
+        after_connect: after_connect,
+        consume_options: [no_ack: true, exclusive: false]
       ]
 
       metadata = []
@@ -65,7 +66,8 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
                   bindings: [],
                   declare_opts: nil,
                   queue: "queue",
-                  after_connect: after_connect
+                  after_connect: after_connect,
+                  consume_options: [no_ack: true, exclusive: false]
                 }}
     end
 

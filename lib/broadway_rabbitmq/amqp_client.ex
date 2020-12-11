@@ -175,6 +175,22 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       the `:declare` and `:bindings` options (described above).
       """
     ],
+    consume_options: [
+      type: :keyword_list,
+      default: [],
+      doc: """
+      Options passed down to `AMQP.Basic.consume/4`. Not all options supported by
+      `AMQP.Basic.consume/4` are available here as some options would conflict with
+      the internal implementation of this producer.
+      """,
+      keys: [
+        consumer_tag: [type: :string],
+        no_local: [type: :boolean],
+        no_ack: [type: :boolean],
+        exclusive: [type: :boolean],
+        arguments: [type: :any]
+      ]
+    ],
     broadway: [type: :any, doc: false]
   ]
 
@@ -195,6 +211,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          bindings: Keyword.fetch!(opts, :bindings),
          qos: Keyword.fetch!(opts, :qos),
          metadata: Keyword.fetch!(opts, :metadata),
+         consume_options: Keyword.fetch!(opts, :consume_options),
          after_connect: Keyword.get(opts, :after_connect, fn _channel -> :ok end)
        }}
     else
@@ -299,8 +316,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   @impl true
-  def consume(channel, config) do
-    {:ok, consumer_tag} = Basic.consume(channel, config.queue)
+  def consume(channel, %{queue: queue, consume_options: consume_options} = _config) do
+    {:ok, consumer_tag} = Basic.consume(channel, queue, _consumer_pid = self(), consume_options)
     consumer_tag
   end
 
