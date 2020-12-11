@@ -275,6 +275,37 @@ defmodule BroadwayRabbitMQ.Producer do
 
     * `:reply_to` - name of the reply queue.
 
+  ## Telemetry
+
+  This producer emits a few [Telemetry](https://github.com/beam-telemetry/telemetry)
+  events which are listed below.
+
+    * `[:broadway_rabbitmq, :amqp, :open_connection, :start | :stop | :exception]` spans -
+      these events are emitted in "span style" when opening an AMQP connection.
+      See `:telemetry.span/3`.
+
+      All these events have the measurements described in `:telemetry.span/3`. The events
+      contain the following metadata:
+
+      * `:connection_name` - the name of the AMQP connection (or `nil` if it doesn't have a name)
+      * `:connection` - the connection info passed when starting the producer (either a URI
+        or a keyword list of options)
+
+    * `[:broadway_rabbitmq, :amqp, :ack, :start | :stop | :exception]` span - these events
+      are emitted in "span style" when acking messages on RabbitMQ. See `:telemetry.span/3`.
+
+      All these events have the measurements described in `:telemetry.span/3`. The events
+      contain no metadata.
+
+    * `[:broadway_rabbitmq, :amqp, :reject, :start | :stop | :exception]` span - these events
+      are emitted in "span style" when acking messages on RabbitMQ. See `:telemetry.span/3`.
+
+      All these events have the measurements described in `:telemetry.span/3`. The `[..., :start]`
+      event contains the following metadata:
+
+      * `:requeue` - a boolean telling if this "reject" is asking RabbitMQ to requeue the message
+        or not.
+
   """
 
   use GenStage
