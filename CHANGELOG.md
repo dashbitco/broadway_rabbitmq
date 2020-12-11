@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.5
+
+  * Add support for a few Telemetry events. See the "Telemetry" section
+    in the docs for `BroadwayRabbitMQ.Producer`.
+
+  * Add support for `:consume_options` when starting a
+    `BroadwayRabbitMQ.Producer` to pass options down to `AMQP.Basic.consume/4`.
+
 ## v0.6.4
 
   * Bump nimble_options dependency to 0.3.5 which fixes some deprecation
