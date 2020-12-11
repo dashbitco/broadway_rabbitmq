@@ -421,7 +421,6 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
   end
 
-  @tag :focus
   test "if the :no_ack consume option is true, the acknowledger is set to NoopAcknowledger" do
     {:ok, broadway} = start_broadway(consume_options: [no_ack: true])
     assert_receive {:setup_channel, :ok, _}
