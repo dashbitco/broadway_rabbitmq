@@ -125,7 +125,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
   ## Connection loss and backoff
 
-  In case the connection cannot be opened or if a stablished connection is lost,
+  In case the connection cannot be opened or if an established connection is lost,
   the producer will try to reconnect using an exponential random backoff strategy.
   The strategy can be configured using the `:backoff_type` option.
 
