@@ -3,6 +3,7 @@ defmodule BroadwayRabbitMQ.MixProject do
 
   @version "0.6.5"
   @description "A RabbitMQ connector for Broadway"
+  @source_url "https://github.com/dashbitco/broadway_rabbitmq"
 
   def project do
     [
@@ -40,14 +41,18 @@ defmodule BroadwayRabbitMQ.MixProject do
     [
       main: "BroadwayRabbitMQ.Producer",
       source_ref: "v#{@version}",
-      source_url: "https://github.com/dashbitco/broadway_rabbitmq"
+      source_url: @source_url,
+      extras: ["CHANGELOG.md"]
     ]
   end
 
   defp package do
     %{
       licenses: ["Apache 2.0"],
-      links: %{"GitHub" => "https://github.com/dashbitco/broadway_rabbitmq"}
+      links: %{
+        "Changelog" => @source_url <> "/blob/master/CHANGELOG.md",
+        "GitHub" => @source_url
+      }
     }
   end
 end
