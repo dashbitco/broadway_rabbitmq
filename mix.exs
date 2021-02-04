@@ -29,7 +29,7 @@ defmodule BroadwayRabbitMQ.MixProject do
   defp deps do
     [
       {:broadway, "~> 0.6.0"},
-      {:amqp, "~> 1.3"},
+      {:amqp, "~> 1.3 or ~> 2.0"},
       {:nimble_options, "~> 0.3.5"},
       {:telemetry, ">= 0.4.2 and < 1.0.0"},
       {:ex_doc, ">= 0.19.0", only: :docs},
