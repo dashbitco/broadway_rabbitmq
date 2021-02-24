@@ -99,7 +99,7 @@ defmodule BroadwayRabbitMQ.Producer do
             qos: [
               prefetch_count: 50
             ]},
-          concurrency: 5
+          concurrency: 1
         ],
         processors: [
           default: []
