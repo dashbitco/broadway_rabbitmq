@@ -85,6 +85,9 @@ defmodule BroadwayRabbitMQ.Producer do
 
   ## Example
 
+      @processor_concurrency 50
+      @max_demand 2
+
       Broadway.start_link(MyBroadway,
         name: MyBroadway,
         producer: [
@@ -97,31 +100,74 @@ defmodule BroadwayRabbitMQ.Producer do
               host: "192.168.0.10"
             ],
             qos: [
-              prefetch_count: 50
+              # See "Back-pressure and `:prefetch_count`" section
+              prefetch_count: @processor_concurrency * @max_demand
             ]},
+          # See "Producer concurrency" section
           concurrency: 1
         ],
         processors: [
-          default: []
+          default: [
+            concurrency: @processor_concurrency,
+            max_demand: @max_demand
+          ]
         ]
       )
 
+  ## Producer concurrency
+
+  For efficiency, you should generally limit the amount of internal queueing.
+  Whenever additional messages are sitting in a busy processor's mailbox, they
+  can't be delivered to another processor which may be available or become
+  available first.
+
+  One posible cause of internal queueing is multiple producers. This is because
+  each processor's demand will be sent to all producers. For example, if a
+  processor demands `2` messages and there are `2` producers, each producer
+  will try to  pull `2` messages and give them to the processor. So the
+  processor may receive `max_demand * <producer concurrency>` messages.
+
+  Setting producer `concurrency: 1` will reduce internal queueing, so this is
+  the recommended setting to start with. **Only increase producer concurrency
+  if you can measure performance improvements in your system**. Adding another
+  single-producer pipeline, or another node running the pipeline, are other
+  ways you may consider to increase throughput.
+
   ## Back-pressure and `:prefetch_count`
 
-  Unlike the RabbitMQ client that has a default `:prefetch_count` = 0,
-  which disables back-pressure, BroadwayRabbitMQ overwrite the default
-  value to `50` enabling the back-pressure mechanism. You can still define
-  it as `0`, however, if you do this, make sure the machine has enough
-  resources to handle the number of messages coming from the broker, and set
-  `:buffer_size` to an appropriate value.
+  Unlike the BroadwaySQS producer, which polls for new messages,
+  BroadwayRabbitMQ receives messages as they are are pushed by RabbitMQ. The
+  `:prefetch_count` setting instructs RabbitMQ to [limit the number of
+  unacknowledged messages a consumer will have at a given
+  moment](https://www.rabbitmq.com/consumer-prefetch.html) (except with a value
+  of `0`, which RabbitMQ treats as infinity).
 
-  This is important because the BroadwayRabbitMQ producer does not work
-  as a poller like BroadwaySQS. Instead, it maintains an active connection
-  with a subscribed consumer that receives messages continuously as they
-  arrive in the queue. This is more efficient than using the `basic.get`
-  method, however, it removes the ability of the GenStage producer to control
-  the demand. Therefore we need to use the `:prefetch_count` option to
-  impose back-pressure at the channel level.
+  Setting a prefetch limit creates back-pressure from Broadway to RabbitMQ so
+  that the pipeline is not overwhelmed with messages. But setting the limit too
+  low will limit throughput. For example, if the `:prefetch_count` were `1`,
+  only one message could be processed at a time, regardless of other settings.
+
+  Although the RabbitMQ client has a default `:prefetch_count` of `0`,
+  BroadwayRabbitMQ overwrites the default value to `50`, enabling the
+  back-pressure mechanism. **To ensure that all processors in a given pipeline
+  can receive messages, the value should be set to at least `max_demand *
+  <number of processors>`**, as in the example above.
+
+  Increasing it beyond that could be helpful if latency from RabbitMQ were
+  high, and in the long term would not cause the pipeline to receive an unfair
+  share of messages, since RabbitMQ uses round-robin delivery to all
+  subscribers. It could mean that a newly-added subscriber would initially
+  receives no messages, as they would have all been prefetched by the existing
+  producer.
+
+  If you're using batchers, you'll need a larger `:prefetch_count` to allow all
+  batchers and processors to be busy simultaneously. Measure your system to
+  decide what number works best.
+
+  You can define `:prefetch_count` as `0` if you wish to disable back-pressure.
+  However, if you do this, make sure the machine has enough resources to handle
+  the number of messages coming from the broker, and set `:buffer_size` to an
+  appropriate value.
 
   ## Connection loss and backoff
 
@@ -144,7 +190,7 @@ defmodule BroadwayRabbitMQ.Producer do
             queue: "my_queue",
             declare: [],
             bindings: [{"my-exchange", []}]},
-          concurrency: 5
+          concurrency: 1
         ],
         processors: [
           default: []
