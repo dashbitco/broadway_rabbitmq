@@ -86,7 +86,7 @@ defmodule BroadwayRabbitMQ.Producer do
   ## Example
 
       @processor_concurrency 50
-      @max_demand 1
+      @max_demand 2
 
       Broadway.start_link(MyBroadway,
         name: MyBroadway,
