@@ -109,6 +109,7 @@ defmodule BroadwayRabbitMQ.Producer do
         processors: [
           default: [
             concurrency: @processor_concurrency,
+            # See "Max demand" section
             max_demand: @max_demand
           ]
         ]
@@ -168,6 +169,14 @@ defmodule BroadwayRabbitMQ.Producer do
   However, if you do this, make sure the machine has enough resources to handle
   the number of messages coming from the broker, and set `:buffer_size` to an
   appropriate value.
+
+  ## Max demand
+
+  The best value for `max_demand` depends on how long your messages take to
+  process. If processing time is long, consider setting it to `1`. Otherwise,
+  the default value of `10` is a good starting point.
+
+  Measure throughput in your own system to see how this setting affects it.
 
   ## Connection loss and backoff
 
