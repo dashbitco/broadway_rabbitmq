@@ -127,12 +127,11 @@ defmodule BroadwayRabbitMQ.Producer do
   will try to  pull `2` messages and give them to the processor. So the
   processor may receive `max_demand * <producer concurrency>` messages.
 
-  Setting `max_demand` to `1` and producer `concurrency: 1` will eliminate
-  internal queueing, so these are the recommended settings to start with.
-  **Only increase producer concurrency if you can measure performance
-  improvements in your system**. Adding another single-producer pipeline, or
-  another node running the pipeline, are other ways you may consider to
-  increase throughput.
+  Setting producer `concurrency: 1` will reduce internal queueing, so this is
+  the recommended setting to start with. **Only increase producer concurrency
+  if you can measure performance improvements in your system**. Adding another
+  single-producer pipeline, or another node running the pipeline, are other
+  ways you may consider to increase throughput.
 
   ## Back-pressure and `:prefetch_count`
 
