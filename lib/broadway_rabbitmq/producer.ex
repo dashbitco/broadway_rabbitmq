@@ -296,8 +296,6 @@ defmodule BroadwayRabbitMQ.Producer do
 
     * `:routing_key` - the name of the queue from which the message was consumed.
 
-    * `:message_count` - the current number of messages in the queue.
-
     * `:content_type` - the MIME type of the message.
 
     * `:content_encoding` - the MIME content encoding of the message.
