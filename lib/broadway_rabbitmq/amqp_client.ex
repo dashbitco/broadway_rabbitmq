@@ -285,8 +285,11 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   defp maybe_declare_queue(channel, queue, declare_opts) do
-    with {:ok, %{queue: queue}} <- Queue.declare(channel, queue, declare_opts) do
-      {:ok, queue}
+    case Queue.declare(channel, queue, declare_opts) do
+      :ok -> {:ok, queue}
+      {:ok, _} -> {:ok, queue}
+      {:error, :ok} -> {:ok, queue}
+      error -> error
     end
   end
 
@@ -297,6 +300,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   defp maybe_bind_queue(channel, queue, [{exchange, opts} | bindings]) do
     case Queue.bind(channel, queue, exchange, opts) do
       :ok -> maybe_bind_queue(channel, queue, bindings)
+      {:error, :ok} -> maybe_bind_queue(channel, queue, bindings)
       {:error, reason} -> {:error, reason}
     end
   end
