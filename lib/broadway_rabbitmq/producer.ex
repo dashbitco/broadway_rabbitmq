@@ -271,6 +271,66 @@ defmodule BroadwayRabbitMQ.Producer do
   One way to handle this is by using [Dead Letter Exchanges](https://www.rabbitmq.com/dlx.html)
   and [TTL and Expiration](https://www.rabbitmq.com/ttl.html).
 
+  ### Dead letter exchange
+
+  #### Example
+
+      use Broadway
+
+      @exchange "x.my_exchange"
+      @exchange_dlx "x.my_exchange.dlx
+      @queue "x.my_queue"
+      @queue_dlx "x.my_queue.dlx"
+
+      def start_link(_opts) do
+        initialize_queues()
+
+        Broadway.start_link(__MODULE__,
+          name: MyDeadLetterBroadway,
+          producer: [
+            module: {
+              BroadwayRabbitMQ.Producer,
+              on_failure: :reject_and_requeue_once,
+              queue: @queue,
+              bindings: [{@exchange, []}],
+              declare: [
+                durable: true,
+                arguments: [
+                  {"x-dead-letter-exchange", :longstr, @exchange_dlx},
+                  {"x-dead-letter-routing-key", :longstr, @queue_dlx}
+                ]
+              ],
+            },
+            concurrency: 4
+          ],
+          processors: [
+            default: [
+              concurrency: 4,
+            ]
+          ]
+        )
+      end
+
+      defp initialize_queues do
+        {:ok, connection} = AMQP.Connection.open()
+        {:ok, channel} = AMQP.Channel.open(connection)
+        AMQP.Exchange.declare(channel, @exchange_dlx, :fanout, durable: true)
+        AMQP.Exchange.declare(channel, @exchange, :fanout, durable: true)
+        AMQP.Queue.declare(channel, @queue_dlx, durable: true)
+        AMQP.Queue.bind(channel, @queue_dlx, @exchange_dlx)
+      end
+
+      @impl true
+      def handle_message(_, message, _) do
+        data = Jason.decode!(message.data, keys: :atoms)
+
+        # Handle data. Raised errors will send to dead letter queue
+        MyApp.DataHandler.handle(data)
+
+        message
+      end
+    end
+
   ## Metadata
 
   You can retrieve additional information about your message by setting the `:metadata` option
