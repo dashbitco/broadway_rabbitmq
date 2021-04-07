@@ -271,9 +271,9 @@ defmodule BroadwayRabbitMQ.Producer do
   One way to handle this is by using [Dead Letter Exchanges](https://www.rabbitmq.com/dlx.html)
   and [TTL and Expiration](https://www.rabbitmq.com/ttl.html).
 
-  ### Dead letter exchange
-
-  #### Example
+  ### Dead-letter exchange example
+  
+  Here is an example of a pipeline with dead-letter exchange configuration:
 
       use Broadway
 
