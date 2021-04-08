@@ -359,6 +359,57 @@ defmodule BroadwayRabbitMQ.Producer do
       * `:requeue` - a boolean telling if this "reject" is asking RabbitMQ to requeue the message
         or not.
 
+  ## Dead-letter Exchanges
+
+  Here's an example of how to use a dead-letter exchange setup with broadway_rabbitmq:
+
+      defmodule MyPipeline do
+        use Broadway
+
+        @queue "my_queue"
+        @exchange "my_exchange"
+        @queue_dlx "my_queue.dlx"
+        @exchange_dlx "my_exchange.dlx"
+
+        def start_link(_opts) do
+          Broadway.start_link(__MODULE__,
+            producer: [
+              module: {
+                BroadwayRabbitMQ.Producer,
+                on_failure: :reject,
+                after_connect: &declare_rabbitmq_topology/1,
+                queue: @queue,
+                declare: [
+                  durable: true,
+                  arguments: [
+                    {"x-dead-letter-exchange", :longstr, @exchange_dlx},
+                    {"x-dead-letter-routing-key", :longstr, @queue_dlx}
+                  ]
+                ],
+                bindings: [{@exchange, []}],
+              },
+              concurrency: 2
+            ],
+            processors: [default: [concurrency: 4]]
+          )
+        end
+
+        defp declare_rabbitmq_topology(amqp_channel) do
+          with :ok <- AMQP.Exchange.declare(amqp_channel, @exchange, :fanout, durable: true),
+               :ok <- AMQP.Exchange.declare(amqp_channel, @exchange_dlx, :fanout, durable: true),
+               {:ok, _} <- AMQP.Queue.declare(amqp_channel, @queue_dlx, durable: true),
+               :ok <- AMQP.Queue.bind(amqp_channel, @queue_dlx, @exchange_dlx) do
+            :ok
+          end
+        end
+
+        @impl true
+        def handle_message(_processor, message, _context) do
+          # Raising errors or returning a "failed" message here sends the message to the
+          # dead-letter queue.
+        end
+      end
+
   """
 
   use GenStage
