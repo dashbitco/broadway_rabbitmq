@@ -351,7 +351,7 @@ defmodule BroadwayRabbitMQ.Producer do
       contain no metadata.
 
     * `[:broadway_rabbitmq, :amqp, :reject, :start | :stop | :exception]` span - these events
-      are emitted in "span style" when acking messages on RabbitMQ. See `:telemetry.span/3`.
+      are emitted in "span style" when rejecting messages on RabbitMQ. See `:telemetry.span/3`.
 
       All these events have the measurements described in `:telemetry.span/3`. The `[..., :start]`
       event contains the following metadata:
