@@ -1,6 +1,5 @@
 defmodule BroadwayRabbitMQ.Backoff do
   @moduledoc false
-  @compile :nowarn_deprecated_function
 
   alias BroadwayRabbitMQ.Backoff
 
@@ -92,37 +91,12 @@ defmodule BroadwayRabbitMQ.Backoff do
   end
 
   defp seed() do
-    case rand_module() do
-      :rand ->
-        {:rand, :rand.seed_s(:exsplus)}
-
-      :random ->
-        {:random, random_seed()}
-    end
+    :rand.seed_s(:exsplus)
   end
 
-  defp rand_module() do
-    {:ok, mods} = :application.get_key(:stdlib, :modules)
+  defp rand(state, min, max) do
+    {int, state} = :rand.uniform_s(max - min + 1, state)
 
-    if :rand in mods do
-      :rand
-    else
-      :random
-    end
-  end
-
-  defp random_seed() do
-    {_, sec, micro} = :os.timestamp()
-    hash = :erlang.phash2({self(), make_ref()})
-
-    case :random.seed(hash, sec, micro) do
-      :undefined -> Process.delete(:random_seed)
-      prev -> Process.put(:random_seed, prev)
-    end
-  end
-
-  defp rand({mod, state}, min, max) do
-    {int, state} = apply(mod, :uniform_s, [max - min + 1, state])
-    {int + min - 1, {mod, state}}
+    {int + min - 1, state}
   end
 end
