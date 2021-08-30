@@ -1,7 +1,7 @@
 defmodule BroadwayRabbitMQ.MixProject do
   use Mix.Project
 
-  @version "0.6.5"
+  @version "0.7.0"
   @description "A RabbitMQ connector for Broadway"
   @source_url "https://github.com/dashbitco/broadway_rabbitmq"
 
@@ -28,11 +28,11 @@ defmodule BroadwayRabbitMQ.MixProject do
 
   defp deps do
     [
-      {:broadway, "~> 0.6.0"},
+      {:broadway, "~> 1.0"},
       {:amqp, "~> 1.3 or ~> 2.0"},
       {:nimble_options, "~> 0.3.5"},
-      {:telemetry, ">= 0.4.2 and < 1.0.0"},
-      {:ex_doc, ">= 0.19.0", only: :docs},
+      {:telemetry, "~> 0.4.3 or ~> 1.0"},
+      {:ex_doc, ">= 0.25.0", only: :docs},
       {:excoveralls, "~> 0.13.3", only: :test}
     ]
   end

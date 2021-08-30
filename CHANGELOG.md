@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.0
+
+  * Add support to AMQP 2.0
+  * Require Broadway 1.0
+
 ## v0.6.5
 
   * Add support for a few Telemetry events. See the "Telemetry" section
