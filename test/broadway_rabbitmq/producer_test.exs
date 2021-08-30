@@ -281,7 +281,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   test "retrieve only selected metadata" do
-    {:ok, broadway} = start_broadway(metadata: [:routing_key, :content_type])
+    broadway = start_broadway(metadata: [:routing_key, :content_type])
 
     deliver_messages(broadway, 1..2,
       extra_metadata: %{
@@ -300,7 +300,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   test "forward messages delivered by the channel" do
-    {:ok, broadway} = start_broadway()
+    broadway = start_broadway()
 
     deliver_messages(broadway, 1..4)
 
@@ -311,7 +311,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   test "acknowledge/reject processed messages" do
-    {:ok, broadway} = start_broadway()
+    broadway = start_broadway()
 
     deliver_messages(broadway, [1, 2, :fail, 4, 5])
 
@@ -326,7 +326,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   describe "controlling on_success/on_failure behavior" do
     test "setting on_success/on_failure when starting the producer" do
-      {:ok, broadway} = start_broadway(on_success: :reject, on_failure: :ack)
+      broadway = start_broadway(on_success: :reject, on_failure: :ack)
 
       deliver_messages(broadway, [1, 2, :fail, 4])
 
@@ -337,7 +337,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "overriding on_success/on_failure through Broadway.Message.configure_ack/2" do
-      {:ok, broadway} = start_broadway()
+      broadway = start_broadway()
 
       deliver_messages(broadway, [
         {:configure, [on_success: :reject], 1},
@@ -349,7 +349,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "passing unsupported options to Broadway.Message.configure_ack/2" do
-      {:ok, broadway} = start_broadway()
+      broadway = start_broadway()
 
       log =
         capture_log(fn ->
@@ -362,7 +362,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "setting on_success/on_failure to an unsupported value raises an error" do
-      {:ok, broadway} = start_broadway()
+      broadway = start_broadway()
 
       log =
         capture_log(fn ->
@@ -377,7 +377,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   describe "handle requeuing with the :on_success/:on_failure options" do
     test "always requeue messages with :on_failure set to :reject_and_requeue" do
-      {:ok, broadway} = start_broadway(on_failure: :reject_and_requeue)
+      broadway = start_broadway(on_failure: :reject_and_requeue)
 
       deliver_messages(broadway, [1, :fail], redelivered: true)
       assert_receive {:reject, :fail, _opts}
@@ -391,7 +391,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "never requeue messages with :on_failure set to :reject" do
-      {:ok, broadway} = start_broadway(on_failure: :reject)
+      broadway = start_broadway(on_failure: :reject)
 
       deliver_messages(broadway, [1, :fail], redelivered: true)
       assert_receive {:reject, :fail, opts}
@@ -407,7 +407,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "requeue messages unless it's been redelivered with :on_failure set to :reject_and_requeue_once" do
-      {:ok, broadway} = start_broadway(on_failure: :reject_and_requeue_once)
+      broadway = start_broadway(on_failure: :reject_and_requeue_once)
 
       deliver_messages(broadway, [1, :fail], redelivered: true)
       assert_receive {:reject, :fail, _opts}
@@ -422,7 +422,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   test "if the :no_ack consume option is true, the acknowledger is set to NoopAcknowledger" do
-    {:ok, broadway} = start_broadway(consume_options: [no_ack: true])
+    broadway = start_broadway(consume_options: [no_ack: true])
     assert_receive {:setup_channel, :ok, _}
 
     deliver_messages(broadway, [1])
@@ -456,7 +456,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   describe "handle connection loss" do
     test "producer is not restarted" do
-      {:ok, broadway} = start_broadway()
+      broadway = start_broadway()
       assert_receive {:setup_channel, :ok, _}
       producer_1 = get_producer(broadway)
 
@@ -470,7 +470,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "open a new connection/channel and keep consuming messages" do
-      {:ok, broadway} = start_broadway()
+      broadway = start_broadway()
       assert_receive {:setup_channel, :ok, channel_1}
 
       deliver_messages(broadway, [1, 2])
@@ -491,7 +491,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "processed messages delivered by the old connection/channel will not be acknowledged" do
-      {:ok, broadway} = start_broadway()
+      broadway = start_broadway()
       assert_receive {:setup_channel, :ok, channel}
 
       deliver_messages(broadway, [1, :break_conn])
@@ -504,7 +504,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "log error when trying to acknowledge" do
-      {:ok, broadway} = start_broadway()
+      broadway = start_broadway()
       assert_receive {:setup_channel, :ok, _channel}
 
       assert capture_log(fn ->
@@ -516,7 +516,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "client is reinitialized every time it reconnects (for example, for switching URLs)" do
-      {:ok, broadway} = start_broadway()
+      broadway = start_broadway()
 
       assert_receive {:setup_channel, :ok, _}
       assert_receive :init_called
@@ -531,7 +531,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   describe "handle consumer cancellation" do
     test "open a new connection/channel and keep consuming messages" do
-      {:ok, broadway} = start_broadway()
+      broadway = start_broadway()
       assert_receive {:setup_channel, :ok, channel_1}
 
       producer = get_producer(broadway)
@@ -550,7 +550,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   describe "handle connection refused" do
     test "log the error and try to reconnect" do
       assert capture_log(fn ->
-               {:ok, broadway} = start_broadway(connect_responses: [:error])
+               broadway = start_broadway(connect_responses: [:error])
                assert_receive {:setup_channel, :error, _}
                assert_receive {:setup_channel, :ok, _}
                stop_broadway(broadway)
@@ -559,7 +559,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     test "if backoff_type = :stop, log the error and don't try to reconnect" do
       assert capture_log(fn ->
-               {:ok, broadway} = start_broadway(connect_responses: [:error], backoff_type: :stop)
+               broadway = start_broadway(connect_responses: [:error], backoff_type: :stop)
                assert_receive {:setup_channel, :error, _}
                refute_receive {:setup_channel, _, _}
                stop_broadway(broadway)
@@ -567,7 +567,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "keep retrying to connect using the backoff strategy" do
-      {:ok, broadway} = start_broadway(connect_responses: [:ok, :error, :error, :error, :ok])
+      broadway = start_broadway(connect_responses: [:ok, :error, :error, :error, :ok])
       assert_receive {:setup_channel, :ok, _}
 
       deliver_messages(broadway, [1, :break_conn])
@@ -586,7 +586,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "reset backoff timeout after a sucessful connection" do
-      {:ok, broadway} = start_broadway(connect_responses: [:error, :ok])
+      broadway = start_broadway(connect_responses: [:error, :ok])
 
       assert_receive {:setup_channel, :error, _}
       assert get_backoff_timeout(broadway) == 10
@@ -600,7 +600,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   describe "unsuccessful acknowledgement" do
     test "raise when an error is thrown acknowledging" do
-      {:ok, broadway} =
+      broadway =
         start_broadway(
           client: FlakyRabbitmqClient,
           on_success: :ack,
@@ -625,7 +625,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "raise when an error is returned from amqp" do
-      {:ok, broadway} =
+      broadway =
         start_broadway(
           client: FlakyRabbitmqClient,
           on_success: :ack,
@@ -662,14 +662,14 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   test "close connection on terminate" do
-    {:ok, broadway} = start_broadway()
+    broadway = start_broadway()
     assert_receive {:setup_channel, :ok, _channel}
-    Process.exit(broadway, :shutdown)
+    Process.exit(Process.whereis(broadway), :shutdown)
     assert_receive :connection_closed
   end
 
   test "if connection goes down, we reconnect" do
-    {:ok, _broadway} = start_broadway()
+    _broadway = start_broadway()
     assert_receive {:setup_channel, :ok, channel}
 
     assert capture_log(fn ->
@@ -680,7 +680,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   test "if channel goes down, we close the connection before reconnecting" do
-    {:ok, _broadway} = start_broadway()
+    _broadway = start_broadway()
     assert_receive {:setup_channel, :ok, channel}
 
     Process.exit(channel.pid, :shutdown)
@@ -688,7 +688,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   test "if producer gets an AMQP basic_cancel, we disconnect" do
-    {:ok, broadway} = start_broadway()
+    broadway = start_broadway()
     producer = Broadway.producer_names(broadway) |> Enum.random()
     assert_receive {:setup_channel, :ok, _channel}
     send(producer, {:basic_cancel, %{consumer_tag: :fake_consumer_tag}})
@@ -706,39 +706,43 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     consume_options = Keyword.get(opts, :consume_options, [])
 
     {:ok, connection_agent} = Agent.start_link(fn -> connect_responses end)
+    name = new_unique_name()
 
-    Broadway.start_link(Forwarder,
-      name: new_unique_name(),
-      context: %{test_pid: self()},
-      producer: [
-        module:
-          {BroadwayRabbitMQ.Producer,
-           client: client,
-           queue: "test",
-           test_pid: self(),
-           backoff_type: backoff_type,
-           backoff_min: 10,
-           backoff_max: 100,
-           connection_agent: connection_agent,
-           qos: [prefetch_count: 10],
-           metadata: metadata,
-           consume_options: consume_options,
-           on_success: on_success,
-           on_failure: on_failure,
-           merge_options: merge_options},
-        concurrency: 1
-      ],
-      processors: [
-        default: [concurrency: 1]
-      ],
-      batchers: [
-        default: [
-          batch_size: 2,
-          batch_timeout: 50,
+    {:ok, _pid} =
+      Broadway.start_link(Forwarder,
+        name: name,
+        context: %{test_pid: self()},
+        producer: [
+          module:
+            {BroadwayRabbitMQ.Producer,
+             client: client,
+             queue: "test",
+             test_pid: self(),
+             backoff_type: backoff_type,
+             backoff_min: 10,
+             backoff_max: 100,
+             connection_agent: connection_agent,
+             qos: [prefetch_count: 10],
+             metadata: metadata,
+             consume_options: consume_options,
+             on_success: on_success,
+             on_failure: on_failure,
+             merge_options: merge_options},
           concurrency: 1
+        ],
+        processors: [
+          default: [concurrency: 1]
+        ],
+        batchers: [
+          default: [
+            batch_size: 2,
+            batch_timeout: 50,
+            concurrency: 1
+          ]
         ]
-      ]
-    )
+      )
+
+    name
   end
 
   defp new_unique_name() do
@@ -759,8 +763,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end)
   end
 
-  defp get_producer(broadway, index \\ 0) do
-    name = Process.info(broadway)[:registered_name]
+  defp get_producer(name, index \\ 0) when is_atom(name) do
     :"#{name}.Broadway.Producer_#{index}"
   end
 
@@ -769,7 +772,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     :sys.get_state(producer).state.module_state.backoff.state
   end
 
-  defp stop_broadway(pid) do
+  defp stop_broadway(name) when is_atom(name) do
+    pid = Process.whereis(name)
     ref = Process.monitor(pid)
     Process.exit(pid, :normal)
 
