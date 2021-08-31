@@ -22,14 +22,14 @@ defmodule BroadwayRabbitMQ.MixProject do
 
   def application do
     [
-      extra_applications: [:lager, :logger]
+      extra_applications: [:logger]
     ]
   end
 
   defp deps do
     [
       {:broadway, "~> 1.0"},
-      {:amqp, "~> 1.3 or ~> 2.0"},
+      {:amqp, "~> 1.3 or ~> 2.0 or ~> 3.0"},
       {:nimble_options, "~> 0.3.5"},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
       {:ex_doc, ">= 0.25.0", only: :docs},
