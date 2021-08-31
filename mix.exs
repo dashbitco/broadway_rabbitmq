@@ -21,15 +21,24 @@ defmodule BroadwayRabbitMQ.MixProject do
   end
 
   def application do
-    [
-      extra_applications: [:lager, :logger]
-    ]
+    :ok = Application.ensure_loaded(:amqp)
+    client = List.to_string(Application.spec(:amqp, :vsn))
+
+    if Version.match?(client, ">= 3.0.0-rc.0") do
+      [
+        extra_applications: [:logger]
+      ]
+    else
+      [
+        extra_applications: [:lager, :logger]
+      ]
+    end
   end
 
   defp deps do
     [
       {:broadway, "~> 1.0"},
-      {:amqp, "~> 1.3 or ~> 2.0"},
+      {:amqp, "~> 1.3 or ~> 2.0 or ~> 3.0"},
       {:nimble_options, "~> 0.3.5"},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
       {:ex_doc, ">= 0.25.0", only: :docs},
