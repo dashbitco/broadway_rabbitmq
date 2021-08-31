@@ -21,18 +21,9 @@ defmodule BroadwayRabbitMQ.MixProject do
   end
 
   def application do
-    :ok = Application.ensure_loaded(:amqp)
-    client = List.to_string(Application.spec(:amqp, :vsn))
-
-    if Version.match?(client, ">= 3.0.0-rc.0") do
-      [
-        extra_applications: [:logger]
-      ]
-    else
-      [
-        extra_applications: [:lager, :logger]
-      ]
-    end
+    [
+      extra_applications: [:logger]
+    ]
   end
 
   defp deps do
