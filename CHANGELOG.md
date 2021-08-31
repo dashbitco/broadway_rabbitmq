@@ -1,11 +1,15 @@
 # Changelog
 
-## v0.7.0
+## Unreleased
+
+  * Add support to AMQP 3.0
+
+## v0.7.0 (2021-08-30)
 
   * Add support to AMQP 2.0
   * Require Broadway 1.0
 
-## v0.6.5
+## v0.6.5 (2020-12-11)
 
   * Add support for a few Telemetry events. See the "Telemetry" section
     in the docs for `BroadwayRabbitMQ.Producer`.
@@ -13,7 +17,7 @@
   * Add support for `:consume_options` when starting a
     `BroadwayRabbitMQ.Producer` to pass options down to `AMQP.Basic.consume/4`.
 
-## v0.6.4
+## v0.6.4 (2020-11-23)
 
   * Bump nimble_options dependency to 0.3.5 which fixes some deprecation
     warnings.
@@ -21,7 +25,7 @@
   * Fix a few potential RabbitMQ issues like possible connection leaking (see
     [#83](https://github.com/dashbitco/broadway_rabbitmq/pull/83)).
 
-## v0.6.3
+## v0.6.3 (2020-11-19)
 
   * Start using nimble_options for validation. This has no practical
     consequences on the API but introduces a new dependency in broadway_rabbitmq
