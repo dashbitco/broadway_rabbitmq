@@ -81,7 +81,14 @@ defmodule BroadwayRabbitMQ.Producer do
   ## Options
 
   #{NimbleOptions.docs(@opts_schema)}
+
+  The following options apply to the underlying AMQP connection:
+
   #{NimbleOptions.docs(BroadwayRabbitMQ.AmqpClient.__opts_schema__())}
+
+  Note AMQP provides the possibility to define the AMQP connection globally.
+  This is not supported by Broadway. You must configure the connection
+  directly in the Broadway pipeline, as shown in the next section.
 
   ## Example
 
