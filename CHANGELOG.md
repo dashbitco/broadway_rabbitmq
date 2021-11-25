@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.1 (2021-11-25)
 
   * Add support to AMQP 3.0
 

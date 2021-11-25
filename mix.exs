@@ -1,7 +1,7 @@
 defmodule BroadwayRabbitMQ.MixProject do
   use Mix.Project
 
-  @version "0.7.0"
+  @version "0.7.1"
   @description "A RabbitMQ connector for Broadway"
   @source_url "https://github.com/dashbitco/broadway_rabbitmq"
 
