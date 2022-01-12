@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.2 (2022-01-12)
+
+  * Support nimble_options 0.4.0 alongside 0.3.x
+
 ## v0.7.1 (2021-11-25)
 
   * Add support to AMQP 3.0
