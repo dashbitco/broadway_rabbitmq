@@ -585,7 +585,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       stop_broadway(broadway)
     end
 
-    test "reset backoff timeout after a sucessful connection" do
+    test "reset backoff timeout after a successful connection" do
       broadway = start_broadway(connect_responses: [:error, :ok])
 
       assert_receive {:setup_channel, :error, _}
