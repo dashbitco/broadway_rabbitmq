@@ -129,7 +129,7 @@ defmodule BroadwayRabbitMQ.Producer do
   can't be delivered to another processor which may be available or become
   available first.
 
-  One posible cause of internal queueing is multiple producers. This is because
+  One possible cause of internal queueing is multiple producers. This is because
   each processor's demand will be sent to all producers. For example, if a
   processor demands `2` messages and there are `2` producers, each producer
   will try to  pull `2` messages and give them to the processor. So the
