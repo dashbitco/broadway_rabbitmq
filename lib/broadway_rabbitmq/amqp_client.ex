@@ -30,7 +30,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   @binding_opts_schema [
     routing_key: [type: :any],
-    no_wait: [type: :any],
     arguments: [type: :any]
   ]
 
@@ -115,7 +114,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         auto_delete: [type: :any, doc: false],
         exclusive: [type: :any, doc: false],
         passive: [type: :any, doc: false],
-        no_wait: [type: :any, doc: false],
         arguments: [type: :any, doc: false]
       ],
       doc: """
@@ -127,7 +125,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       producer stages to consume from the same queue, use a specific queue name.
       You can still declare the same queue as many times as you want because
       queue creation is idempotent (as long as you don't use the `passive: true`
-      option). For the available options, see `AMQP.Queue.declare/3`.
+      option). For the available options, see `AMQP.Queue.declare/3`, `:nowait` is not supported.
       """
     ],
     bindings: [
