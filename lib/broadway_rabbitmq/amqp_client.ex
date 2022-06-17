@@ -48,13 +48,16 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         {:or,
          [
            {:custom, __MODULE__, :__validate_amqp_uri__, []},
+           {:custom, __MODULE__, :__validate_custom_pool__, []},
            keyword_list: @connection_opts_schema
          ]},
       default: [],
       doc: """
-      Defines an AMQP URI or a set of options used by
-      the RabbitMQ client to open the connection with the RabbitMQ broker. See
-      `AMQP.Connection.open/1` for the full list of options.
+      Defines an AMQP URI, a custom_pool option or a set of options used by
+      the RabbitMQ client to open the connection with the RabbitMQ broker.
+      The custom_pool option receives a tuple `{:custom_pool, module, options}`,
+      the module must implement the `BroadwayRabbitMQ.ChannelPool` behaviour.
+      See `AMQP.Connection.open/1` for the full list of connection options.
       """
     ],
     qos: [
@@ -202,7 +205,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          :ok <- validate_declare_opts(opts[:declare], opts[:queue]) do
       {:ok,
        %{
-         connection: Keyword.fetch!(opts, :connection),
+         connection: Keyword.get(opts, :connection),
          queue: Keyword.fetch!(opts, :queue),
          name: Keyword.fetch!(opts, :name),
          declare_opts: Keyword.get(opts, :declare, nil),
@@ -223,21 +226,9 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   # opened.
   @impl true
   def setup_channel(config) do
-    {name, config} = Map.pop(config, :name, :undefined)
-
-    telemetry_meta = %{connection: config.connection, connection_name: name}
-
-    case :telemetry.span([:broadway_rabbitmq, :amqp, :open_connection], telemetry_meta, fn ->
-           {Connection.open(config.connection, name), telemetry_meta}
-         end) do
-      {:ok, conn} ->
-        # We need to link so that if our process crashes, the AMQP connection will go
-        # down. We're trapping exits in the producer anyways so on our end this looks
-        # like a monitor, pretty much.
-        true = Process.link(conn.pid)
-
-        with {:ok, channel} <- Channel.open(conn),
-             :ok <- call_after_connect(config, channel),
+    case get_channel(config) do
+      {:ok, channel} ->
+        with :ok <- call_after_connect(config, channel),
              :ok <- Basic.qos(channel, config.qos),
              {:ok, queue} <- maybe_declare_queue(channel, config.queue, config.declare_opts),
              :ok <- maybe_bind_queue(channel, queue, config.bindings) do
@@ -249,12 +240,12 @@ defmodule BroadwayRabbitMQ.AmqpClient do
             # the channel), we need to close the connection, or otherwise we would leave the
             # connection open and leak it. In amqp_client, closing the connection also closes
             # everything related to it (like the channel, so we're good).
-            _ = Connection.close(conn)
+            close_channel(config, channel)
             {:error, reason}
         end
 
-      {:error, reason} ->
-        {:error, reason}
+      error ->
+        error
     end
   catch
     :exit, {:timeout, {:gen_server, :call, [amqp_conn_pid, :connect, timeout]}}
@@ -263,6 +254,52 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       # call timeout triggers and becomes a zombie connection.
       true = Process.exit(amqp_conn_pid, :kill)
       {:error, :timeout}
+  end
+
+  defp get_channel(%{connection: {:custom_pool, module, args}}) do
+    with {:ok, channel} <- module.checkout_channel(args),
+         true <- Process.link(channel.pid) do
+      {:ok, channel}
+    end
+  end
+
+  defp get_channel(config) do
+    with {:ok, conn} <- connection_span(config),
+         # We need to link so that if our process crashes, the AMQP connection will go
+         # down. We're trapping exits in the producer anyways so on our end this looks
+         # like a monitor, pretty much.
+         true <- Process.link(conn.pid),
+         {{:ok, chann}, _conn} <- {Channel.open(conn), conn} do
+      {:ok, chann}
+    else
+      {:error, reason} ->
+        {:error, reason}
+
+      {{:error, reason}, conn} ->
+        Connection.close(conn)
+        {:error, reason}
+    end
+  end
+
+  defp close_channel(%{connection: {:custom_pool, module, args}}, channel) do
+    case module.checkin_channel(args) do
+      :ok -> :ok
+      _ -> Channel.close(channel)
+    end
+  end
+
+  defp close_channel(_config, channel) do
+    Channel.close(channel)
+    Connection.close(channel.conn)
+  end
+
+  defp connection_span(config) do
+    {name, config} = Map.pop(config, :name, :undefined)
+    telemetry_meta = %{connection: config.connection, connection_name: name}
+
+    :telemetry.span([:broadway_rabbitmq, :amqp, :open_connection], telemetry_meta, fn ->
+      {Connection.open(config.connection, name), telemetry_meta}
+    end)
   end
 
   defp call_after_connect(config, channel) do
@@ -357,12 +394,14 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     end
   end
 
-  def __validate_amqp_uri__(uri) do
+  def __validate_amqp_uri__(uri) when is_binary(uri) do
     case uri |> to_charlist() |> :amqp_uri.parse() do
       {:ok, _amqp_params} -> {:ok, uri}
       {:error, reason} -> {:error, "failed parsing AMQP URI: #{inspect(reason)}"}
     end
   end
+
+  def __validate_amqp_uri__(_value), do: {:error, "failed parsing AMQP URI."}
 
   defp validate_declare_opts(declare_opts, queue) do
     if queue == "" and is_nil(declare_opts) do
@@ -382,4 +421,19 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   def __validate_binding__(other) do
     {:error, "expected binding to be a {exchange, opts} tuple, got: #{inspect(other)}"}
   end
+
+  def __validate_custom_pool__({:custom_pool, module, _options} = value) when is_atom(module) do
+    with {:module, ^module} <- Code.ensure_loaded(module),
+         behaviours <- module.__info__(:attributes)[:behaviour],
+         behaviours <- List.wrap(behaviours),
+         true <- Enum.any?(behaviours, &(&1 == BroadwayRabbitMQ.ChannelPool)) do
+      {:ok, value}
+    else
+      _error ->
+        {:error,
+         "#{module} must be a module that implements BroadwayRabbitMQ.ChannelPool behaviour."}
+    end
+  end
+
+  def __validate_custom_pool__(_value), do: {:error, "invalid custom_pool option"}
 end
