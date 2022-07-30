@@ -100,16 +100,17 @@ defmodule BroadwayRabbitMQ.Producer do
         producer: [
           module:
             {BroadwayRabbitMQ.Producer,
-            queue: "my_queue",
-            connection: [
-              username: "user",
-              password: "password",
-              host: "192.168.0.10"
-            ],
-            qos: [
-              # See "Back-pressure and `:prefetch_count`" section
-              prefetch_count: @processor_concurrency * @max_demand
-            ]},
+             queue: "my_queue",
+             connection: [
+               username: "user",
+               password: "password",
+               host: "192.168.0.10"
+             ],
+             qos: [
+               # See "Back-pressure and `:prefetch_count`" section
+               prefetch_count: @processor_concurrency * @max_demand
+             ],
+             on_failure: :reject_and_requeue},
           # See "Producer concurrency" section
           concurrency: 1
         ],
