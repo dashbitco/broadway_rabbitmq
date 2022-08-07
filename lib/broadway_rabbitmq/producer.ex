@@ -381,6 +381,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
         def start_link(_opts) do
           Broadway.start_link(__MODULE__,
+            name: __MODULE__,
             producer: [
               module: {
                 BroadwayRabbitMQ.Producer,
