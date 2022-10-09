@@ -367,6 +367,13 @@ defmodule BroadwayRabbitMQ.Producer do
       * `:requeue` - a boolean telling if this "reject" is asking RabbitMQ to requeue the message
         or not.
 
+    * `[:broadway_rabbitmq, :amqp, :connection_failure]` execution - this event is executed when
+      the connection to RabbitMQ fails. See `:telemetry.execute/3`.
+
+      The event contains the following metadata:
+
+      * `:reason` - the reason for the failure.
+
   ## Dead-letter Exchanges
 
   Here's an example of how to use a dead-letter exchange setup with broadway_rabbitmq:
@@ -702,6 +709,12 @@ defmodule BroadwayRabbitMQ.Producer do
 
   defp handle_connection_failure(state, reason) do
     _ = Logger.error("Cannot connect to RabbitMQ broker: #{inspect(reason)}")
+
+    :telemetry.execute(
+      [:broadway_rabbitmq, :amqp, :connection_failure],
+      %{system_time: System.system_time()},
+      %{reason: reason}
+    )
 
     case reason do
       {:auth_failure, 'Disconnected'} ->
