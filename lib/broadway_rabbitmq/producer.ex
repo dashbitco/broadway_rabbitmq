@@ -712,7 +712,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
     :telemetry.execute(
       [:broadway_rabbitmq, :amqp, :connection_failure],
-      %{system_time: DateTime.utc_now()},
+      %{system_time: System.system_time()},
       %{reason: reason}
     )
 
