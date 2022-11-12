@@ -557,6 +557,31 @@ defmodule BroadwayRabbitMQ.ProducerTest do
              end) =~ "Cannot connect to RabbitMQ broker"
     end
 
+    @tag :capture_log
+    test "emit a Telemetry event" do
+      parent = self()
+      ref = make_ref()
+
+      :telemetry.attach(
+        "handle-connection-refused-emit-telemetry-event",
+        [:broadway_rabbitmq, :amqp, :connection_failure],
+        fn _event, measurement, meta, _config -> send(parent, {ref, measurement, meta}) end,
+        _config = nil
+      )
+
+      broadway = start_broadway(connect_responses: [:error])
+      assert_receive {:setup_channel, :error, _}
+      assert_receive {:setup_channel, :ok, _}
+
+      assert_receive {^ref, measurement, meta}, 500
+      assert %{system_time: _} = measurement
+      assert meta == %{reason: :econnrefused}
+
+      stop_broadway(broadway)
+    after
+      :telemetry.detach("handle-connection-refused-emit-telemetry-event")
+    end
+
     test "if backoff_type = :stop, log the error and don't try to reconnect" do
       assert capture_log(fn ->
                broadway = start_broadway(connect_responses: [:error], backoff_type: :stop)
