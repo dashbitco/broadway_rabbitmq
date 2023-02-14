@@ -6,8 +6,8 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
   defmodule PoolA do
     @behaviour BroadwayRabbitMQ.ChannelPool
 
-    def checkout(_), do: {:error, :test}
-    def checkin(_), do: {:error, :test}
+    def checkout_channel(_), do: {:ok, %AMQP.Channel{}}
+    def checkin_channel(_), do: :ok
   end
 
   defmodule PoolB do

@@ -205,7 +205,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          :ok <- validate_declare_opts(opts[:declare], opts[:queue]) do
       {:ok,
        %{
-         connection: Keyword.get(opts, :connection),
+         connection: Keyword.fetch!(opts, :connection),
          queue: Keyword.fetch!(opts, :queue),
          name: Keyword.fetch!(opts, :name),
          declare_opts: Keyword.get(opts, :declare, nil),
@@ -257,9 +257,20 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   defp get_channel(%{connection: {:custom_pool, module, args}}) do
-    with {:ok, channel} <- module.checkout_channel(args),
-         true <- Process.link(channel.pid) do
-      {:ok, channel}
+    case module.checkout_channel(args) do
+      {:ok, channel} ->
+        Process.link(channel.pid)
+        {:ok, channel}
+
+      {:error, %{__exception__: true} = exception} ->
+        {:error, exception}
+
+      other ->
+        raise """
+        expected #{Exception.format_mfa(module, :checkout_channel, 1)} to \
+        return {:ok, AMQP.Channel.t()} or {:error, exception}, got: \
+        #{inspect(other)}\
+        """
     end
   end
 
@@ -268,7 +279,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          # We need to link so that if our process crashes, the AMQP connection will go
          # down. We're trapping exits in the producer anyways so on our end this looks
          # like a monitor, pretty much.
-         true <- Process.link(conn.pid),
+         true = Process.link(conn.pid),
          {{:ok, chann}, _conn} <- {Channel.open(conn), conn} do
       {:ok, chann}
     else
@@ -283,8 +294,21 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   defp close_channel(%{connection: {:custom_pool, module, args}}, channel) do
     case module.checkin_channel(args) do
-      :ok -> :ok
-      _ -> Channel.close(channel)
+      :ok ->
+        :ok
+
+      {:error, %{__exception__: true} = exception} ->
+        Channel.close(channel)
+        {:error, exception}
+
+      other ->
+        Channel.close(channel)
+
+        raise """
+        expected #{Exception.format_mfa(module, :checkin_channel, 1)} to \
+        return :ok or {:error, exception}, got: \
+        #{inspect(other)}\
+        """
     end
   end
 
@@ -424,8 +448,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   def __validate_custom_pool__({:custom_pool, module, _options} = value) when is_atom(module) do
     with {:module, ^module} <- Code.ensure_loaded(module),
-         behaviours <- module.__info__(:attributes)[:behaviour],
-         behaviours <- List.wrap(behaviours),
+         behaviours = List.wrap(module.__info__(:attributes)[:behaviour]),
          true <- Enum.any?(behaviours, &(&1 == BroadwayRabbitMQ.ChannelPool)) do
       {:ok, value}
     else

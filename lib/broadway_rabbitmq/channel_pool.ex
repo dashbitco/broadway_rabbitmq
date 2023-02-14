@@ -10,11 +10,11 @@ defmodule BroadwayRabbitMQ.ChannelPool do
   Invoked when BroadwayRabbitMQ needs a channel.
   """
   @callback checkout_channel(options :: term()) ::
-              {:ok, AMQP.Channel.t()} | {:error, reason :: term()}
+              {:ok, AMQP.Channel.t()} | {:error, reason :: Exception.t()}
 
   @doc """
   Invoked when BroadwayRabbitMQ doesn't need a channel anymore.
   In case your pool fails to handle this properly, BroadwayRabbitMQ will try to close the channel itself.
   """
-  @callback checkin_channel(options :: term()) :: :ok | {:error, reason :: term()}
+  @callback checkin_channel(options :: term()) :: :ok | {:error, reason :: Exception.t()}
 end
