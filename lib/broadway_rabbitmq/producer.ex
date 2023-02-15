@@ -484,7 +484,7 @@ defmodule BroadwayRabbitMQ.Producer do
   end
 
   @impl true
-  def handle_info({:basic_consume_ok, %{consumer_tag: tag}}, state) do
+  def handle_info({:basic_consume_ok, %{consumer_tag: tag}}, %{consumer_tag: tag} = state) do
     {:noreply, [], %{state | consumer_tag: tag}}
   end
 

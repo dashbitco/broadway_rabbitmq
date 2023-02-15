@@ -60,7 +60,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
         {:ok, channel}
       else
         send(test_pid, {:setup_channel, :error, nil})
-        {:error, :econnrefused}
+        {:error, status}
       end
     end
 
@@ -80,6 +80,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     @impl true
     def consume(_channel, _config) do
+      send(self(), {:basic_consume_ok, %{consumer_tag: :fake_consumer_tag}})
       :fake_consumer_tag
     end
 
@@ -139,8 +140,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     @impl true
-    def ack(_channel, _delivery_tag) do
-      raise "Cannot acknowledge"
+    def ack(_channel, delivery_tag) do
+      raise "cannot acknowledge with delivery tag: #{inspect(delivery_tag)}"
     end
 
     @impl true
@@ -285,17 +286,23 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   test ":prefetch_count set to 0 requires explicit :buffer_size setting" do
-    assert_raise(
-      ArgumentError,
-      ":prefetch_count is 0, specify :buffer_size explicitly",
-      fn ->
-        BroadwayRabbitMQ.Producer.init(
-          queue: "test",
-          qos: [prefetch_count: 0],
-          on_failure: :reject_and_requeue
-        )
-      end
-    )
+    assert_raise ArgumentError, ":prefetch_count is 0, specify :buffer_size explicitly", fn ->
+      BroadwayRabbitMQ.Producer.init(
+        queue: "test",
+        qos: [prefetch_count: 0],
+        on_failure: :reject_and_requeue
+      )
+    end
+
+    {:producer, _, options} =
+      BroadwayRabbitMQ.Producer.init(
+        queue: "test",
+        qos: [prefetch_count: 0],
+        buffer_size: 100,
+        on_failure: :reject_and_requeue
+      )
+
+    assert options[:buffer_size] == 100
   end
 
   test "retrieve only selected metadata" do
@@ -449,6 +456,14 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     assert message.acknowledger == {Broadway.NoopAcknowledger, nil, nil}
   end
 
+  test "handles the :basic_consume_ok message when consuming" do
+    broadway = start_broadway()
+    assert_receive {:setup_channel, :ok, channel}
+
+    deliver_messages(broadway, [1])
+    assert_receive {:message_handled, %Broadway.Message{}, ^channel}
+  end
+
   describe "prepare_for_draining" do
     test "cancel consumer and keep the current state" do
       channel = FakeChannel.new(self())
@@ -563,12 +578,23 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
       stop_broadway(broadway)
     end
+
+    test "dealing with :basic_consume_ok messages" do
+      broadway = start_broadway()
+      assert_receive {:setup_channel, :ok, _channel}
+
+      producer = get_producer(broadway)
+
+      send(producer, {:basic_cancel_ok, %{consumer_tag: :fake_consumer_tag}})
+
+      stop_broadway(broadway)
+    end
   end
 
   describe "handle connection refused" do
     test "log the error and try to reconnect" do
       assert capture_log(fn ->
-               broadway = start_broadway(connect_responses: [:error])
+               broadway = start_broadway(connect_responses: [:econnrefused])
                assert_receive {:setup_channel, :error, _}
                assert_receive {:setup_channel, :ok, _}
                stop_broadway(broadway)
@@ -587,7 +613,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
         _config = nil
       )
 
-      broadway = start_broadway(connect_responses: [:error])
+      broadway = start_broadway(connect_responses: [:econnrefused])
       assert_receive {:setup_channel, :error, _}
       assert_receive {:setup_channel, :ok, _}
 
@@ -602,7 +628,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     test "if backoff_type = :stop, log the error and don't try to reconnect" do
       assert capture_log(fn ->
-               broadway = start_broadway(connect_responses: [:error], backoff_type: :stop)
+               broadway = start_broadway(connect_responses: [:econnrefused], backoff_type: :stop)
                assert_receive {:setup_channel, :error, _}
                refute_receive {:setup_channel, _, _}
                stop_broadway(broadway)
@@ -610,7 +636,9 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "keep retrying to connect using the backoff strategy" do
-      broadway = start_broadway(connect_responses: [:ok, :error, :error, :error, :ok])
+      broadway =
+        start_broadway(connect_responses: [:ok, :econnrefused, :econnrefused, :econnrefused, :ok])
+
       assert_receive {:setup_channel, :ok, _}
 
       deliver_messages(broadway, [1, :break_conn])
@@ -629,7 +657,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "reset backoff timeout after a successful connection" do
-      broadway = start_broadway(connect_responses: [:error, :ok])
+      broadway = start_broadway(connect_responses: [:econnrefused, :ok])
 
       assert_receive {:setup_channel, :error, _}
       assert get_backoff_timeout(broadway) == 10
@@ -638,6 +666,28 @@ defmodule BroadwayRabbitMQ.ProducerTest do
       assert get_backoff_timeout(broadway) == nil
 
       stop_broadway(broadway)
+    end
+
+    test "with auth_failure 'Disconnected'" do
+      assert capture_log(fn ->
+               broadway = start_broadway(connect_responses: [{:auth_failure, 'Disconnected'}])
+               assert_receive {:setup_channel, :error, _}
+               assert_receive {:setup_channel, :ok, _}
+               stop_broadway(broadway)
+             end) =~ "Cannot connect to RabbitMQ broker: {:auth_failure, 'Disconnected'}"
+    end
+
+    test "with socket_closed_unexpectedly" do
+      assert capture_log(fn ->
+               broadway =
+                 start_broadway(
+                   connect_responses: [{:socket_closed_unexpectedly, :"connection.start"}]
+                 )
+
+               assert_receive {:setup_channel, :error, _}
+               assert_receive {:setup_channel, :ok, _}
+               stop_broadway(broadway)
+             end) =~ "Cannot connect to RabbitMQ broker: {:socket_closed_unexpectedly"
     end
   end
 
@@ -739,15 +789,19 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   describe "with custom pool" do
+    @tag :capture_log
     test "calls the pool to check out a channel" do
-      start_broadway(
-        connection: {:custom_pool, CustomPool, self()},
-        client: BroadwayRabbitMQ.AmqpClient,
-        after_connect: fn _channel -> {:error, :some_reason} end
-      )
+      broadway =
+        start_broadway(
+          connection: {:custom_pool, CustomPool, self()},
+          client: BroadwayRabbitMQ.AmqpClient,
+          after_connect: fn _channel -> {:error, :some_reason} end
+        )
 
       assert_receive {:checkout_channel_called, new_channel}
       assert_receive {:checkin_channel_called, ^new_channel}
+
+      stop_broadway(broadway)
     end
   end
 
