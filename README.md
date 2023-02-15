@@ -1,8 +1,13 @@
 # BroadwayRabbitMQ
 
+[![hex.pm badge](https://img.shields.io/badge/Package%20on%20hex.pm-informational)](https://hex.pm/packages/broadway_rabbitmq)
+[![Documentation badge](https://img.shields.io/badge/Documentation-ff69b4)][docs]
+[![CI](https://github.com/dashbitco/broadway_rabbitmq/actions/workflows/ci.yml/badge.svg)](https://github.com/dashbitco/broadway_rabbitmq/actions/workflows/ci.yml)
+[![Coverage Status](https://coveralls.io/repos/github/dashbitco/broadway_rabbitmq/badge.svg?branch=master)](https://coveralls.io/github/dashbitco/broadway_rabbitmq?branch=master)
+
 A RabbitMQ connector for [Broadway](https://github.com/dashbitco/broadway).
 
-Documentation can be found at [https://hexdocs.pm/broadway_rabbitmq](https://hexdocs.pm/broadway_rabbitmq).
+Documentation can be found at [https://hexdocs.pm/broadway_rabbitmq][docs].
 For more details on using Broadway with RabbitMQ, please see the
 [RabbitMQ Guide](https://hexdocs.pm/broadway/rabbitmq.html).
 
@@ -66,3 +71,5 @@ Copyright 2020 Dashbit
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   See the License for the specific language governing permissions and
   limitations under the License.
+
+[docs]: https://hexdocs.pm/broadway_rabbitmq
