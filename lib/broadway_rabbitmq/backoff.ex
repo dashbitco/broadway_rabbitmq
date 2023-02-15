@@ -1,14 +1,20 @@
 defmodule BroadwayRabbitMQ.Backoff do
   @moduledoc false
 
-  alias BroadwayRabbitMQ.Backoff
-
   @min 1_000
   @max 30_000
 
+  @type t() :: %__MODULE__{
+          type: :rand | :exp | :rand_exp,
+          min: non_neg_integer(),
+          max: non_neg_integer(),
+          state: term()
+        }
+
   defstruct [:type, :min, :max, :state]
 
-  def new(opts) do
+  @spec new(keyword()) :: t() | nil
+  def new(opts) when is_list(opts) do
     case Keyword.fetch!(opts, :backoff_type) do
       :stop ->
         nil
@@ -19,35 +25,41 @@ defmodule BroadwayRabbitMQ.Backoff do
     end
   end
 
-  def backoff(%Backoff{type: :rand, min: min, max: max, state: state} = s) do
+  @spec backoff(t()) :: {non_neg_integer(), t()}
+  def backoff(backoff)
+
+  def backoff(%__MODULE__{type: :rand, min: min, max: max, state: state} = s) do
     {backoff, state} = rand(state, min, max)
-    {backoff, %Backoff{s | state: state}}
+    {backoff, %__MODULE__{s | state: state}}
   end
 
-  def backoff(%Backoff{type: :exp, min: min, state: nil} = s) do
-    {min, %Backoff{s | state: min}}
+  def backoff(%__MODULE__{type: :exp, min: min, state: nil} = s) do
+    {min, %__MODULE__{s | state: min}}
   end
 
-  def backoff(%Backoff{type: :exp, max: max, state: prev} = s) do
+  def backoff(%__MODULE__{type: :exp, max: max, state: prev} = s) do
     require Bitwise
     next = min(Bitwise.<<<(prev, 1), max)
-    {next, %Backoff{s | state: next}}
+    {next, %__MODULE__{s | state: next}}
   end
 
-  def backoff(%Backoff{type: :rand_exp, max: max, state: state} = s) do
+  def backoff(%__MODULE__{type: :rand_exp, max: max, state: state} = s) do
     {prev, lower, rand_state} = state
     next_min = min(prev, lower)
     next_max = min(prev * 3, max)
     {next, rand_state} = rand(rand_state, next_min, next_max)
-    {next, %Backoff{s | state: {next, lower, rand_state}}}
+    {next, %__MODULE__{s | state: {next, lower, rand_state}}}
   end
 
-  def reset(%Backoff{type: :rand} = s), do: s
-  def reset(%Backoff{type: :exp} = s), do: %Backoff{s | state: nil}
+  @spec reset(t()) :: t()
+  def reset(backoff)
 
-  def reset(%Backoff{type: :rand_exp, min: min, state: state} = s) do
+  def reset(%__MODULE__{type: :rand} = s), do: s
+  def reset(%__MODULE__{type: :exp} = s), do: %__MODULE__{s | state: nil}
+
+  def reset(%__MODULE__{type: :rand_exp, min: min, state: state} = s) do
     {_, lower, rand_state} = state
-    %Backoff{s | state: {min, lower, rand_state}}
+    %__MODULE__{s | state: {min, lower, rand_state}}
   end
 
   ## Internal
@@ -74,16 +86,16 @@ defmodule BroadwayRabbitMQ.Backoff do
   end
 
   defp new(:rand, min, max) do
-    %Backoff{type: :rand, min: min, max: max, state: seed()}
+    %__MODULE__{type: :rand, min: min, max: max, state: seed()}
   end
 
   defp new(:exp, min, max) do
-    %Backoff{type: :exp, min: min, max: max, state: nil}
+    %__MODULE__{type: :exp, min: min, max: max, state: nil}
   end
 
   defp new(:rand_exp, min, max) do
     lower = max(min, div(max, 3))
-    %Backoff{type: :rand_exp, min: min, max: max, state: {min, lower, seed()}}
+    %__MODULE__{type: :rand_exp, min: min, max: max, state: {min, lower, seed()}}
   end
 
   defp new(type, _, _) do

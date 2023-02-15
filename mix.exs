@@ -18,7 +18,8 @@ defmodule BroadwayRabbitMQ.MixProject do
       package: package(),
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
-        docs: :docs
+        docs: :docs,
+        "coveralls.html": :test
       ]
     ]
   end
