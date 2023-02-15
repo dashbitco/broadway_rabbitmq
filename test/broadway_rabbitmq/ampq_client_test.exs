@@ -3,16 +3,6 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
   alias BroadwayRabbitMQ.AmqpClient
 
-  defmodule PoolA do
-    @behaviour BroadwayRabbitMQ.ChannelPool
-
-    def checkout_channel(_), do: {:ok, %AMQP.Channel{}}
-    def checkin_channel(_), do: :ok
-  end
-
-  defmodule PoolB do
-  end
-
   test "default options" do
     assert {:ok,
             %{
@@ -93,16 +83,28 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
       assert message =~ "failed parsing AMQP URI"
     end
 
-    test "custom_pool module implements BroadwayRabbitMQ.ChannelPool behaviour" do
-      custom_pool = {:custom_pool, PoolA, []}
+    test "custom pool module which implements BroadwayRabbitMQ.ChannelPool behaviour" do
+      defmodule ValidPool do
+        @behaviour BroadwayRabbitMQ.ChannelPool
+
+        @impl true
+        def checkout_channel(_args), do: {:ok, %AMQP.Channel{}}
+
+        @impl true
+        def checkin_channel(_args, _channel), do: :ok
+      end
+
+      custom_pool = {:custom_pool, ValidPool, []}
 
       assert {:ok, %{connection: ^custom_pool}} =
                AmqpClient.init(queue: "queue", connection: custom_pool)
+    after
+      :code.delete(ValidPool)
+      :code.purge(ValidPool)
     end
 
-    test "custom_pool module doesn't implements BroadwayRabbitMQ.ChannelPool behaviour" do
-      custom_pool = {:custom_pool, PoolB, []}
-
+    test "custom pool module which doesn't implement BroadwayRabbitMQ.ChannelPool behaviour" do
+      custom_pool = {:custom_pool, URI, []}
       assert {:error, message} = AmqpClient.init(queue: "queue", connection: custom_pool)
       assert message =~ "implements BroadwayRabbitMQ.ChannelPool"
     end

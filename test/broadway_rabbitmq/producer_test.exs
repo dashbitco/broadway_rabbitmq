@@ -210,6 +210,24 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
   end
 
+  defmodule CustomPool do
+    @behaviour BroadwayRabbitMQ.ChannelPool
+
+    @impl true
+    def checkout_channel(parent) do
+      channel = %AMQP.Channel{pid: spawn(fn -> Process.sleep(:infinity) end)}
+      send(parent, {:checkout_channel_called, channel})
+      {:ok, channel}
+    end
+
+    @impl true
+    def checkin_channel(parent, %AMQP.Channel{} = channel) do
+      send(parent, {:checkin_channel_called, channel})
+      Process.exit(channel.pid, :kill)
+      :ok
+    end
+  end
+
   test "raise an ArgumentError with proper message when client options are invalid" do
     assert_raise(
       ArgumentError,
@@ -720,6 +738,19 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     assert_receive :connection_closed
   end
 
+  describe "with custom pool" do
+    test "calls the pool to check out a channel" do
+      start_broadway(
+        connection: {:custom_pool, CustomPool, self()},
+        client: BroadwayRabbitMQ.AmqpClient,
+        after_connect: fn _channel -> {:error, :some_reason} end
+      )
+
+      assert_receive {:checkout_channel_called, new_channel}
+      assert_receive {:checkin_channel_called, ^new_channel}
+    end
+  end
+
   defp start_broadway(opts \\ []) do
     connect_responses = Keyword.get(opts, :connect_responses, [])
     backoff_type = Keyword.get(opts, :backoff_type, :exp)
@@ -729,42 +760,44 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     merge_options = Keyword.get(opts, :merge_options, fn _ -> [] end)
     client = Keyword.get(opts, :client, FakeRabbitmqClient)
     consume_options = Keyword.get(opts, :consume_options, [])
+    connection = Keyword.get(opts, :connection, nil)
+    after_connect = Keyword.get(opts, :after_connect, nil)
 
     {:ok, connection_agent} = Agent.start_link(fn -> connect_responses end)
     name = new_unique_name()
+
+    producer_opts = [
+      client: client,
+      queue: "test",
+      test_pid: self(),
+      backoff_type: backoff_type,
+      backoff_min: 10,
+      backoff_max: 100,
+      connection_agent: connection_agent,
+      qos: [prefetch_count: 10],
+      metadata: metadata,
+      consume_options: consume_options,
+      on_success: on_success,
+      on_failure: on_failure,
+      merge_options: merge_options,
+      connection: connection,
+      after_connect: after_connect
+    ]
+
+    producer_opts =
+      if client == BroadwayRabbitMQ.AmqpClient do
+        Keyword.drop(producer_opts, [:test_pid, :connection_agent])
+      else
+        producer_opts
+      end
 
     {:ok, _pid} =
       Broadway.start_link(Forwarder,
         name: name,
         context: %{test_pid: self()},
-        producer: [
-          module:
-            {BroadwayRabbitMQ.Producer,
-             client: client,
-             queue: "test",
-             test_pid: self(),
-             backoff_type: backoff_type,
-             backoff_min: 10,
-             backoff_max: 100,
-             connection_agent: connection_agent,
-             qos: [prefetch_count: 10],
-             metadata: metadata,
-             consume_options: consume_options,
-             on_success: on_success,
-             on_failure: on_failure,
-             merge_options: merge_options},
-          concurrency: 1
-        ],
-        processors: [
-          default: [concurrency: 1]
-        ],
-        batchers: [
-          default: [
-            batch_size: 2,
-            batch_timeout: 50,
-            concurrency: 1
-          ]
-        ]
+        producer: [module: {BroadwayRabbitMQ.Producer, producer_opts}, concurrency: 1],
+        processors: [default: [concurrency: 1]],
+        batchers: [default: [batch_size: 2, batch_timeout: 50, concurrency: 1]]
       )
 
     name
@@ -804,6 +837,8 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     receive do
       {:DOWN, ^ref, _, _, _} -> :ok
+    after
+      1000 -> flunk("Broadway did not stop within 1000ms")
     end
   end
 end

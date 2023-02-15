@@ -53,10 +53,11 @@ defmodule BroadwayRabbitMQ.AmqpClient do
          ]},
       default: [],
       doc: """
-      Defines an AMQP URI, a custom_pool option or a set of options used by
+      Defines an AMQP URI (a string), a custom pool, or a set of options used by
       the RabbitMQ client to open the connection with the RabbitMQ broker.
-      The custom_pool option receives a tuple `{:custom_pool, module, options}`,
-      the module must implement the `BroadwayRabbitMQ.ChannelPool` behaviour.
+      To use a custom pool, pass a `{:custom_pool, module, args}` tuple, see
+      `BroadwayRabbitMQ.ChannelPool` for more information. If passing an AMQP URI
+      or a list of options, this producer manages the AMQP connection instead.
       See `AMQP.Connection.open/1` for the full list of connection options.
       """
     ],
@@ -259,9 +260,10 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   defp get_channel(%{connection: {:custom_pool, module, args}}) do
     case module.checkout_channel(args) do
       {:ok, channel} ->
-        Process.link(channel.pid)
+        true = Process.link(channel.pid)
         {:ok, channel}
 
+      # TODO: use is_exception/1 when we depend on Elixir 1.11+
       {:error, %{__exception__: true} = exception} ->
         {:error, exception}
 
@@ -275,28 +277,29 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   defp get_channel(config) do
-    with {:ok, conn} <- connection_span(config),
+    with {:ok, conn} <- open_connection_instrumented(config),
          # We need to link so that if our process crashes, the AMQP connection will go
          # down. We're trapping exits in the producer anyways so on our end this looks
          # like a monitor, pretty much.
          true = Process.link(conn.pid),
-         {{:ok, chann}, _conn} <- {Channel.open(conn), conn} do
-      {:ok, chann}
+         {{:ok, chan}, _conn} <- {Channel.open(conn), conn} do
+      {:ok, chan}
     else
       {:error, reason} ->
         {:error, reason}
 
       {{:error, reason}, conn} ->
-        Connection.close(conn)
+        _ = Connection.close(conn)
         {:error, reason}
     end
   end
 
   defp close_channel(%{connection: {:custom_pool, module, args}}, channel) do
-    case module.checkin_channel(args) do
+    case module.checkin_channel(args, channel) do
       :ok ->
         :ok
 
+      # TODO: use is_exception/1 when we depend on Elixir 1.11+
       {:error, %{__exception__: true} = exception} ->
         Channel.close(channel)
         {:error, exception}
@@ -317,7 +320,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     Connection.close(channel.conn)
   end
 
-  defp connection_span(config) do
+  defp open_connection_instrumented(config) do
     {name, config} = Map.pop(config, :name, :undefined)
     telemetry_meta = %{connection: config.connection, connection_name: name}
 
@@ -454,7 +457,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     else
       _error ->
         {:error,
-         "#{module} must be a module that implements BroadwayRabbitMQ.ChannelPool behaviour."}
+         "#{module} must be a module that implements BroadwayRabbitMQ.ChannelPool behaviour"}
     end
   end
 
