@@ -25,7 +25,11 @@ jobs:
             lint: lint
             coverage: coverage
     steps:
-      - uses: actions/checkout@v2
+      - name: Clone the repository
+        uses: actions/checkout@v2
+
+      - name: Start Docker
+        run: docker-compose up --detach
 
       - uses: erlef/setup-beam@v1
         with:
