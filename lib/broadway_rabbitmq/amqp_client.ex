@@ -317,6 +317,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   defp close_channel(_config, channel) do
     Channel.close(channel)
+    Process.unlink(channel.conn.pid)
     Connection.close(channel.conn)
   end
 
@@ -338,6 +339,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
         {:error, reason}
 
       other ->
+        close_channel(config, channel)
         raise "unexpected return value from the :after_connect function: #{inspect(other)}"
     end
   end
@@ -441,7 +443,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   def __validate_binding__({exchange, binding_opts}) when is_binary(exchange) do
     case NimbleOptions.validate(binding_opts, @binding_opts_schema) do
       {:ok, validated_binding_opts} -> {:ok, {exchange, validated_binding_opts}}
-      {:error, reason} -> {:error, reason}
+      {:error, %NimbleOptions.ValidationError{} = reason} -> {:error, Exception.message(reason)}
     end
   end
 
