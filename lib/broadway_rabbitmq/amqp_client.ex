@@ -368,14 +368,26 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   @impl true
   def ack(channel, delivery_tag) do
     :telemetry.span([:broadway_rabbitmq, :amqp, :ack], _meta = %{}, fn ->
-      {Basic.ack(channel, delivery_tag), _meta = %{}}
+      try do
+        Basic.ack(channel, delivery_tag)
+      catch
+        :exit, {:noproc, _} -> {{:error, :noproc}, _meta = %{}}
+      else
+        result -> {result, _meta = %{}}
+      end
     end)
   end
 
   @impl true
   def reject(channel, delivery_tag, opts) do
     :telemetry.span([:broadway_rabbitmq, :amqp, :reject], %{requeue: opts[:requeue]}, fn ->
-      {Basic.reject(channel, delivery_tag, opts), _meta = %{}}
+      try do
+        Basic.reject(channel, delivery_tag, opts)
+      catch
+        :exit, {:noproc, _} -> {{:error, :noproc}, _meta = %{}}
+      else
+        result -> {result, _meta = %{}}
+      end
     end)
   end
 
