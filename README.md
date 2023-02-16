@@ -55,6 +55,26 @@ Configure Broadway with one or more producers using `BroadwayRabbitMQ.Producer`:
   end
 ```
 
+## Contributing
+
+To run tests that don't need any dependency, use:
+
+```bash
+mix test --exclude integration
+```
+
+To run integration tests, you'll need RabbitMQ running on your `localhost:5672`.
+For simplicity, this repository includes a
+[`docker-compose.yml`](./docker-compose.yml) file that you can use to run
+RabbitMQ via [Docker Compose](https://docs.docker.com/compose/). If you have
+[Docker](https://www.docker.com) installed, you can run:
+
+```bash
+docker-compose up -d
+```
+
+Then, you can run `mix test`.
+
 ## License
 
 Copyright 2019 Plataformatec\

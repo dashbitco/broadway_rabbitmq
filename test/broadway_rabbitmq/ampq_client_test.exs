@@ -1,5 +1,5 @@
 defmodule BroadwayRabbitMQ.AmqpClientTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias BroadwayRabbitMQ.AmqpClient
 
@@ -185,6 +185,15 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
                {:error, message}
     end
 
+    test ":bindings with invalid binding options" do
+      message =
+        "list element at position 0 in :bindings failed validation: unknown options " <>
+          "[:invalid], valid options are: [:routing_key, :arguments]"
+
+      assert AmqpClient.init(queue: "queue", bindings: [{"my-exchange", [invalid: true]}]) ==
+               {:error, message}
+    end
+
     test ":merge_options options should be merged with normal opts" do
       merge_options_fun = fn index -> [queue: "queue#{index}"] end
 
@@ -257,5 +266,111 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
         )
       end
     end
+  end
+
+  describe "setup_channel/1" do
+    @describetag :integration
+
+    test "returns a real channel" do
+      {:ok, config} = AmqpClient.init(queue: "queue", declare: [auto_delete: true])
+      assert {:ok, %AMQP.Channel{} = channel} = AmqpClient.setup_channel(config)
+
+      # Make sure that the channel is real by issuing a real AMQP operation.
+      assert {:ok, %{queue: "queue"}} = AMQP.Queue.status(channel, "queue")
+
+      AMQP.Channel.close(channel)
+      Process.unlink(channel.conn.pid)
+      AmqpClient.close_connection(channel.conn)
+    end
+
+    test "uses an existing queue if :declare is not specified" do
+      {:ok, control_channel} = open_channel()
+      {:ok, %{queue: queue}} = AMQP.Queue.declare(control_channel, "", auto_delete: true)
+
+      {:ok, config} = AmqpClient.init(queue: queue)
+      assert {:ok, %AMQP.Channel{} = channel} = AmqpClient.setup_channel(config)
+      assert {:ok, %{queue: ^queue}} = AMQP.Queue.status(channel, queue)
+
+      AMQP.Channel.close(channel)
+      Process.unlink(channel.conn.pid)
+      AMQP.Connection.close(channel.conn)
+    end
+
+    test "can bind the given queue to things" do
+      {:ok, control_channel} = open_channel()
+      {:ok, %{queue: queue}} = AMQP.Queue.declare(control_channel, "", auto_delete: true)
+
+      {:ok, config} = AmqpClient.init(queue: queue, bindings: [{"amq.direct", []}])
+      assert {:ok, %AMQP.Channel{} = channel} = AmqpClient.setup_channel(config)
+
+      # Consume from the queue.
+      assert {:ok, consumer_tag} = AMQP.Basic.consume(channel, queue, self())
+      assert_receive {:basic_consume_ok, %{consumer_tag: ^consumer_tag}}
+
+      # Check that if we publish to the exchange, we get the message because the binding
+      # actually happened.
+      :ok = AMQP.Basic.publish(control_channel, "", _routing_key = queue, "hello")
+      assert_receive {:basic_deliver, "hello", _meta}, 1000
+
+      AMQP.Channel.close(channel)
+      Process.unlink(channel.conn.pid)
+      AMQP.Connection.close(channel.conn)
+    end
+
+    @tag :capture_log
+    test "raises if :after_connect returns a bad value" do
+      {:ok, config} =
+        AmqpClient.init(
+          queue: "",
+          declare: [auto_delete: true],
+          after_connect: fn _channel -> :bad_return_value end
+        )
+
+      message = "unexpected return value from the :after_connect function: :bad_return_value"
+      assert_raise RuntimeError, message, fn -> AmqpClient.setup_channel(config) end
+    end
+  end
+
+  @tag :integration
+  test "consume/2 + ack/2 + reject/3 + cancel/2" do
+    {:ok, control_channel} = open_channel()
+    {:ok, %{queue: queue}} = AMQP.Queue.declare(control_channel, "", auto_delete: true)
+
+    {:ok, config} = AmqpClient.init(queue: queue, bindings: [{"amq.direct", []}])
+    assert {:ok, %AMQP.Channel{} = channel} = AmqpClient.setup_channel(config)
+
+    # Consume from the queue.
+    consumer_tag = AmqpClient.consume(channel, config)
+    assert_receive {:basic_consume_ok, %{consumer_tag: ^consumer_tag}}
+
+    # Publish a message and ack it.
+    :ok = AMQP.Basic.publish(control_channel, "", _routing_key = queue, "hello")
+    assert_receive {:basic_deliver, "hello", %{delivery_tag: delivery_tag}}, 1000
+    assert :ok = AmqpClient.ack(channel, delivery_tag)
+
+    # Publish a message and reject it.
+    :ok = AMQP.Basic.publish(control_channel, "", _routing_key = queue, "hello")
+    assert_receive {:basic_deliver, "hello", %{delivery_tag: delivery_tag}}, 1000
+    assert :ok = AmqpClient.reject(channel, delivery_tag, requeue: false)
+
+    # Cancel.
+    assert {:ok, ^consumer_tag} = AmqpClient.cancel(channel, consumer_tag)
+    assert_receive {:basic_cancel_ok, %{consumer_tag: ^consumer_tag}}
+
+    AMQP.Channel.close(channel)
+    Process.unlink(channel.conn.pid)
+    AMQP.Connection.close(channel.conn)
+  end
+
+  defp open_channel do
+    {:ok, conn} = AMQP.Connection.open("amqp://localhost")
+    {:ok, channel} = AMQP.Channel.open(conn)
+
+    on_exit(fn ->
+      AMQP.Channel.close(channel)
+      AMQP.Connection.close(conn)
+    end)
+
+    {:ok, channel}
   end
 end
