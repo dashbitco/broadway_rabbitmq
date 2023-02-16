@@ -268,6 +268,21 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
     end
   end
 
+  test "ack/2 when the channel is down" do
+    {pid, ref} = spawn_monitor(fn -> :ok end)
+    assert_receive {:DOWN, ^ref, _, _, _}
+
+    assert {:error, :noproc} = AmqpClient.ack(%AMQP.Channel{pid: pid}, "delivery-tag-1234")
+  end
+
+  test "reject/2 when the channel is down" do
+    {pid, ref} = spawn_monitor(fn -> :ok end)
+    assert_receive {:DOWN, ^ref, _, _, _}
+
+    assert {:error, :noproc} =
+             AmqpClient.reject(%AMQP.Channel{pid: pid}, "delivery-tag-1234", requeue: false)
+  end
+
   describe "setup_channel/1" do
     @describetag :integration
 

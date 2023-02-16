@@ -535,6 +535,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
   def handle_info({:EXIT, conn_pid, reason}, %{channel: %{conn: %{pid: conn_pid}}} = state) do
     Logger.warn("AMQP connection went down with reason: #{inspect(reason)}")
+    state = %{state | channel: nil, consumer_tag: nil}
     {:noreply, [], connect(state, :init_client)}
   end
 
