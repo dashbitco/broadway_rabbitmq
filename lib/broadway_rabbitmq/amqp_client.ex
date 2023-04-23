@@ -82,26 +82,6 @@ defmodule BroadwayRabbitMQ.AmqpClient do
       The name of the AMQP connection to use.
       """
     ],
-    backoff_min: [
-      type: :non_neg_integer,
-      doc: """
-      The minimum backoff interval (default: `1_000`).
-      """
-    ],
-    backoff_max: [
-      type: :non_neg_integer,
-      doc: """
-      The maximum backoff interval (default: `30_000`).
-      """
-    ],
-    backoff_type: [
-      type: {:in, [:exp, :rand, :rand_exp, :stop]},
-      doc: """
-      The backoff strategy. `:stop` for no backoff and
-      to stop, `:exp` for exponential, `:rand` for random and `:rand_exp` for
-      random exponential (default: `:rand_exp`).
-      """
-    ],
     metadata: [
       type: {:list, :atom},
       default: [],
