@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.0
+
+  * Add the `BroadwayRabbitMQ.ChannelPool` behaviour.
+  * Add the `[:broadway_rabbitmq, :amqp, :connection_failure]` Telemetry event.
+  * Bump Elixir requirement to 1.8+.
+  * Allow nimble_options 1.0+.
+
 ## v0.7.2 (2022-01-12)
 
   * Support nimble_options 0.4.0 alongside 0.3.x
