@@ -445,7 +445,8 @@ defmodule BroadwayRabbitMQ.AmqpClient do
 
   def __validate_custom_pool__({:custom_pool, module, _options} = value) when is_atom(module) do
     with {:module, ^module} <- Code.ensure_loaded(module),
-         behaviours = List.wrap(module.__info__(:attributes)[:behaviour]),
+         behaviours =
+           module.__info__(:attributes) |> Keyword.get_values(:behaviour) |> List.flatten(),
          true <- Enum.any?(behaviours, &(&1 == BroadwayRabbitMQ.ChannelPool)) do
       {:ok, value}
     else
