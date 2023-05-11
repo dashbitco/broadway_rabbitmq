@@ -452,7 +452,7 @@ defmodule BroadwayRabbitMQ.AmqpClient do
     else
       _error ->
         {:error,
-         "#{module} must be a module that implements BroadwayRabbitMQ.ChannelPool behaviour"}
+         "#{inspect(module)} must be a module that implements BroadwayRabbitMQ.ChannelPool behaviour"}
     end
   end
 
