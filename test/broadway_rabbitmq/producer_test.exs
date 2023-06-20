@@ -669,12 +669,16 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "with auth_failure 'Disconnected'" do
-      assert capture_log(fn ->
-               broadway = start_broadway(connect_responses: [{:auth_failure, ~c"Disconnected"}])
-               assert_receive {:setup_channel, :error, _}
-               assert_receive {:setup_channel, :ok, _}
-               stop_broadway(broadway)
-             end) =~ "Cannot connect to RabbitMQ broker: {:auth_failure, 'Disconnected'}"
+      log =
+        capture_log(fn ->
+          broadway = start_broadway(connect_responses: [{:auth_failure, ~c"Disconnected"}])
+          assert_receive {:setup_channel, :error, _}
+          assert_receive {:setup_channel, :ok, _}
+          stop_broadway(broadway)
+        end)
+
+      assert log =~ "Cannot connect to RabbitMQ broker: {:auth_failure, 'Disconnected'}" or
+               log =~ "Cannot connect to RabbitMQ broker: {:auth_failure, ~c\"Disconnected\"}"
     end
 
     test "with socket_closed_unexpectedly" do
