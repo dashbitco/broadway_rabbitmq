@@ -36,8 +36,11 @@ defmodule BroadwayRabbitMQ.MixProject do
       {:amqp, "~> 1.3 or ~> 2.0 or ~> 3.0"},
       {:nimble_options, "~> 0.3.5 or ~> 0.4.0 or ~> 1.0"},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
+
+      # Dev and test dependencies
       {:ex_doc, ">= 0.25.0", only: :docs},
-      {:excoveralls, "~> 0.14.4", only: :test}
+      {:excoveralls, "~> 0.14.4", only: :test},
+      {:ssl_verify_fun, "~> 1.1.0", manager: :rebar3, override: true}
     ]
   end
 
