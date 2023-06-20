@@ -697,15 +697,6 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
   describe "unsuccessful acknowledgement" do
     test "raise when an error is thrown acknowledging" do
-      broadway =
-        start_broadway(
-          client: FlakyRabbitmqClient,
-          on_success: :ack,
-          on_failure: :reject
-        )
-
-      deliver_messages(broadway, [:fail_to_ack])
-
       assert_raise(RuntimeError, fn ->
         Message.ack_immediately(%Message{
           data: :fail_to_ack,
@@ -722,15 +713,6 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     test "raise when an error is returned from amqp" do
-      broadway =
-        start_broadway(
-          client: FlakyRabbitmqClient,
-          on_success: :ack,
-          on_failure: :reject
-        )
-
-      deliver_messages(broadway, [:fail_to_ack])
-
       msgs =
         Enum.map(["failure one", "failure two"], fn data ->
           %Message{
@@ -759,6 +741,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
   end
 
   test "close connection on terminate" do
+    Process.flag(:trap_exit, true)
     broadway = start_broadway()
     assert_receive {:setup_channel, :ok, _channel}
     Process.exit(Process.whereis(broadway), :shutdown)

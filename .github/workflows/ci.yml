@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       MIX_ENV: test
-      GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
@@ -21,7 +21,7 @@ jobs:
               otp: "21.3.8.17"
           - pair:
               elixir: "1.15.0"
-              otp: "26.0"
+              otp: "25.3"
             lint: lint
             coverage: coverage
     steps:
