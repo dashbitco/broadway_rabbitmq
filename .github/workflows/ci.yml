@@ -17,48 +17,59 @@ jobs:
       matrix:
         include:
           - pair:
-              elixir: 1.8.2
-              otp: 21.3.8.17
+              elixir: "1.8.2"
+              otp: "21.3.8.17"
           - pair:
-              elixir: 1.14.3
-              otp: 24.3
+              elixir: "1.15.0"
+              otp: "26.0"
             lint: lint
             coverage: coverage
     steps:
       - name: Clone the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Start Docker
         run: docker-compose up --detach
 
-      - uses: erlef/setup-beam@v1
+      - name: Install Erlang/OTP and Elixir
+        uses: erlef/setup-beam@v1
         with:
-          otp-version: ${{matrix.pair.otp}}
-          elixir-version: ${{matrix.pair.elixir}}
+          otp-version: ${{ matrix.pair.otp }}
+          elixir-version: ${{ matrix.pair.elixir }}
 
-      - uses: actions/cache@v2
+      - name: Cache Mix dependencies
+        uses: actions/cache@v3
         with:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-${{matrix.pair.elixir}}-${{matrix.pair.otp}}-${{ hashFiles('**/mix.lock') }}
+          key: |
+            ${{ runner.os }}-mix-${{ matrix.pair.elixir }}-${{ matrix.pair.otp }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-${{matrix.pair.elixir}}-${{matrix.pair.otp}}-
+            ${{ runner.os }}-mix-${{ matrix.pair.elixir }}-${{ matrix.pair.otp }}-
 
-      - run: mix deps.get
+      - name: Fetch Mix dependencies
+        run: mix deps.get
 
-      - run: mix format --check-formatted
+      - name: Run the formatter
+        run: mix format --check-formatted
         if: ${{ matrix.lint }}
 
-      - run: mix deps.unlock --check-unused
+      - name: Check for unused dependencies
+        run: mix deps.unlock --check-unused
         if: ${{ matrix.lint }}
 
-      - run: mix deps.compile
+      - name: Compile Mix dependencies
+        run: mix deps.compile
 
-      - run: mix compile --warnings-as-errors
+      - name: Compile code and check for warnings
+        run: mix compile --warnings-as-errors
         if: ${{ matrix.lint }}
 
-      - run: mix test
+      - name: Run tests
+        run: mix test
+        if: ${{ !matrix.coverage }}
 
-      - run: mix coveralls.github
-        if: ${{matrix.coverage}}
+      - name: Run tests with coverage
+        run: mix coveralls.github
+        if: ${{ matrix.coverage }}
