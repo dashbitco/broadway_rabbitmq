@@ -670,7 +670,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
 
     test "with auth_failure 'Disconnected'" do
       assert capture_log(fn ->
-               broadway = start_broadway(connect_responses: [{:auth_failure, 'Disconnected'}])
+               broadway = start_broadway(connect_responses: [{:auth_failure, ~c"Disconnected"}])
                assert_receive {:setup_channel, :error, _}
                assert_receive {:setup_channel, :ok, _}
                stop_broadway(broadway)
