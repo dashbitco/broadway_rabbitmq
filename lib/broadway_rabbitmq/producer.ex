@@ -718,7 +718,7 @@ defmodule BroadwayRabbitMQ.Producer do
     )
 
     case reason do
-      {:auth_failure, 'Disconnected'} ->
+      {:auth_failure, ~c"Disconnected"} ->
         handle_backoff(state)
 
       {:socket_closed_unexpectedly, :"connection.start"} ->
