@@ -491,7 +491,7 @@ defmodule BroadwayRabbitMQ.Producer do
   # RabbitMQ sends this in a few scenarios, like if the queue this consumer
   # is consuming from gets deleted. See https://www.rabbitmq.com/consumer-cancel.html.
   def handle_info({:basic_cancel, %{consumer_tag: tag}}, %{consumer_tag: tag} = state) do
-    Logger.warn("Received AMQP basic_cancel from RabbitMQ")
+    Logger.warning("Received AMQP basic_cancel from RabbitMQ")
     state = disconnect(state)
     {:noreply, [], connect(state, :init_client)}
   end
@@ -534,13 +534,13 @@ defmodule BroadwayRabbitMQ.Producer do
   end
 
   def handle_info({:EXIT, conn_pid, reason}, %{channel: %{conn: %{pid: conn_pid}}} = state) do
-    Logger.warn("AMQP connection went down with reason: #{inspect(reason)}")
+    Logger.warning("AMQP connection went down with reason: #{inspect(reason)}")
     state = %{state | channel: nil, consumer_tag: nil}
     {:noreply, [], connect(state, :init_client)}
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{channel_ref: ref} = state) do
-    Logger.warn("AMQP channel went down with reason: #{inspect(reason)}")
+    Logger.warning("AMQP channel went down with reason: #{inspect(reason)}")
     state = disconnect(state)
     {:noreply, [], connect(state, :init_client)}
   end
