@@ -39,8 +39,7 @@ defmodule BroadwayRabbitMQ.MixProject do
 
       # Dev and test dependencies
       {:ex_doc, ">= 0.25.0", only: :docs},
-      {:excoveralls, "~> 0.14.4", only: :test},
-      {:ssl_verify_fun, "~> 1.1.0", manager: :rebar3, override: true}
+      {:excoveralls, "~> 0.17.0", only: :test}
     ]
   end
 
