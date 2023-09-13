@@ -1,7 +1,7 @@
 defmodule BroadwayRabbitMQ.RabbitmqClient do
   @moduledoc false
 
-  alias AMQP.{Basic, Channel, Connection}
+  alias AMQP.{Basic, Channel}
 
   @typep config :: %{
            connection: keyword,
@@ -18,5 +18,5 @@ defmodule BroadwayRabbitMQ.RabbitmqClient do
               any
   @callback consume(channel :: Channel.t(), config) :: Basic.consumer_tag()
   @callback cancel(channel :: Channel.t(), Basic.consumer_tag()) :: :ok | Basic.error()
-  @callback close_connection(conn :: Connection.t()) :: :ok | {:error, any}
+  @callback close_connection(config, channel :: Channel.t()) :: :ok | {:error, any}
 end

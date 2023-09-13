@@ -668,9 +668,9 @@ defmodule BroadwayRabbitMQ.Producer do
   defp requeue?(:reject_and_requeue, _redelivered), do: true
   defp requeue?(:reject_and_requeue_once, redelivered), do: !redelivered
 
-  defp disconnect(%{channel: channel, client: client} = state) do
+  defp disconnect(%{channel: channel, client: client, config: config} = state) do
     if channel do
-      _ = client.close_connection(channel.conn)
+      _ = client.close_connection(config, channel)
       %{state | channel: nil}
     else
       state
