@@ -295,7 +295,7 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
       AMQP.Channel.close(channel)
       Process.unlink(channel.conn.pid)
-      AmqpClient.close_connection(channel.conn)
+      AMQP.Connection.close(channel.conn)
     end
 
     test "uses an existing queue if :declare is not specified" do

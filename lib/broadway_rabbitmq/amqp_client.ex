@@ -383,9 +383,9 @@ defmodule BroadwayRabbitMQ.AmqpClient do
   end
 
   @impl true
-  def close_connection(conn) do
-    if Process.alive?(conn.pid) do
-      Connection.close(conn)
+  def close_connection(config, channel) do
+    if Process.alive?(channel.pid) do
+      close_channel(config, channel)
     else
       :ok
     end

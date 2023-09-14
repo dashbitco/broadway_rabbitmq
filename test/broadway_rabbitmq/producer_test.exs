@@ -96,7 +96,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     @impl true
-    def close_connection(%{test_pid: test_pid}) do
+    def close_connection(_config, %{test_pid: test_pid}) do
       send(test_pid, :connection_closed)
       :ok
     end
@@ -167,7 +167,7 @@ defmodule BroadwayRabbitMQ.ProducerTest do
     end
 
     @impl true
-    def close_connection(%{test_pid: test_pid}) do
+    def close_connection(_config, %{test_pid: test_pid}) do
       send(test_pid, :connection_closed)
       :ok
     end
