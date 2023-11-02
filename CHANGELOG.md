@@ -1,6 +1,12 @@
 # Changelog
 
-## v0.8.0
+## v0.8.1 (2023-11-02)
+
+  * Fix compilation warning around the use of `Logger.warn/2`.
+  * Fix a bug with validating a behaviour when implementing multiple behaviours.
+  * Fix closing connection from channel pool (see [#129](https://github.com/dashbitco/broadway_rabbitmq/pull/129)).
+
+## v0.8.0 (2023-04-25)
 
   * Add the `BroadwayRabbitMQ.ChannelPool` behaviour.
   * Add the `[:broadway_rabbitmq, :amqp, :connection_failure]` Telemetry event.
