@@ -39,7 +39,7 @@ defmodule BroadwayRabbitMQ.MixProject do
 
       # Dev and test dependencies
       {:ex_doc, ">= 0.25.0", only: :docs},
-      {:excoveralls, "~> 0.17.0", only: :test}
+      {:excoveralls, "~> 0.18.0", only: :test}
     ]
   end
 
