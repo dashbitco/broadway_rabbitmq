@@ -378,15 +378,15 @@ defmodule BroadwayRabbitMQ.Producer do
 
   Dead-letter exchanges are normal RabbitMQ exchanges designated for receiving messages
   that have been rejected elsewhere.  You can reference a dead-letter exchange when
-  defining a queue by supplying an `"x-dead-letter-exchange"` argument and optionally an
+  defining a queue by supplying a `"x-dead-letter-exchange"` argument and optionally a
   `"x-dead-letter-routing-key"`. When a queue has a dead-letter exchange defined, then
-  failing a message with `Broadway.failed/2` or raising an exception in `Broadway.handle_message/3`
+  failing a message with `Broadway.Message.failed/2` or raising an exception in `c:Broadway.handle_message/3`
   causes the message to be republished to the exchange named in the `"x-dead-letter-exchange"`
   argument. The message's original routing key is kept unless the `"x-dead-letter-routing-key"`
   argument specifies an override.
 
   A bit more care is needed during setup when using dead-letter exchanges because the dead-letter
-  exchange must be declared and exist _before_ you attempt to reference it when declaring a queue.
+  exchange must be declared and exist *before* you attempt to reference it when declaring a queue.
   For this reason, you may need to take additional steps when setting up your RabbitMQ instance
   beyond what is available to you in the `:after_connect` option.
 
@@ -413,7 +413,6 @@ defmodule BroadwayRabbitMQ.Producer do
       )
 
     :ok = AMQP.Queue.bind(channel, "my_queue", "my_exchange", [])
-
 
   Once you have your exchanges and queues established, you can start Broadway pipelines
   to consume messages in the queues. For a thorough example, we need one pipeline which
@@ -479,10 +478,9 @@ defmodule BroadwayRabbitMQ.Producer do
       end
 
 
-
   To test out the dead-letter republishing behavior, try publishing a message into your
   primary exchange and observe that it gets republished and consumed by the queue in the
-  dead-letter exchange, e.g.
+  dead-letter exchange:
 
         iex> {:ok, connection} = AMQP.Connection.open()
         iex> {:ok, channel} = AMQP.Channel.open(connection)
@@ -490,6 +488,7 @@ defmodule BroadwayRabbitMQ.Producer do
         :ok
         [debug] Failing message; this should republish to the dead-letter exchange
         [debug] Dead letter message received!
+
   """
 
   use GenStage
