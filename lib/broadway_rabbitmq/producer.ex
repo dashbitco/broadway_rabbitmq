@@ -414,7 +414,7 @@ defmodule BroadwayRabbitMQ.Producer do
 
       :ok = AMQP.Queue.bind(channel, "my_queue", "my_exchange", [])
 
-  Once you have your exchanges and queues established, you can start Broadway pipelines
+  Once you have your exchanges and queues declared, you can start Broadway pipelines
   to consume messages in the queues. For a thorough example, we need one pipeline which
   will fail messages and another pipeline to consume messages from the dead-letter exchange.
 
