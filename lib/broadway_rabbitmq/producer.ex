@@ -392,27 +392,27 @@ defmodule BroadwayRabbitMQ.Producer do
 
   You can declare your exchanges and queues in a `Mix` task or before your application starts:
 
-    {:ok, connection} = AMQP.Connection.open()
-    {:ok, channel} = AMQP.Channel.open(connection)
+      {:ok, connection} = AMQP.Connection.open()
+      {:ok, channel} = AMQP.Channel.open(connection)
 
-    # Declare exchanges
-    :ok = AMQP.Exchange.declare(channel, "my_exchange", :fanout, durable: true)
-    :ok = AMQP.Exchange.declare(channel, "my_exchange.dlx", :fanout, durable: true)
+      # Declare exchanges
+      :ok = AMQP.Exchange.declare(channel, "my_exchange", :fanout, durable: true)
+      :ok = AMQP.Exchange.declare(channel, "my_exchange.dlx", :fanout, durable: true)
 
-    # Define and bind queues within the exchange depending on your needs
-    {:ok, _} = AMQP.Queue.declare(channel, "my_queue.dlx", durable: true)
-    :ok = AMQP.Queue.bind(channel, "my_queue.dlx", "my_exchange.dlx", [])
+      # Define and bind queues within the exchange depending on your needs
+      {:ok, _} = AMQP.Queue.declare(channel, "my_queue.dlx", durable: true)
+      :ok = AMQP.Queue.bind(channel, "my_queue.dlx", "my_exchange.dlx", [])
 
-    {:ok, _} =
-      AMQP.Queue.declare(channel, "my_queue",
-        durable: true,
-        arguments: [
-          {"x-dead-letter-exchange", :longstr, "my_exchange.dlx"},
-          {"x-dead-letter-routing-key", :longstr, "my_queue.dlx"}
-        ]
-      )
+      {:ok, _} =
+        AMQP.Queue.declare(channel, "my_queue",
+          durable: true,
+          arguments: [
+            {"x-dead-letter-exchange", :longstr, "my_exchange.dlx"},
+            {"x-dead-letter-routing-key", :longstr, "my_queue.dlx"}
+          ]
+        )
 
-    :ok = AMQP.Queue.bind(channel, "my_queue", "my_exchange", [])
+      :ok = AMQP.Queue.bind(channel, "my_queue", "my_exchange", [])
 
   Once you have your exchanges and queues established, you can start Broadway pipelines
   to consume messages in the queues. For a thorough example, we need one pipeline which
