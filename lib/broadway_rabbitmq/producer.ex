@@ -423,7 +423,9 @@ defmodule BroadwayRabbitMQ.Producer do
 
       defmodule MyPipeline do
         use Broadway
+
         require Logger
+
         @queue "my_queue"
 
         def start_link(_opts) do
