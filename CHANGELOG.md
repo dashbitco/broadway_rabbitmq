@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.8.2 (2024-11-12)
+
+  * Add support to AMQP 4.0
+
 ## v0.8.1 (2023-11-02)
 
   * Fix compilation warning around the use of `Logger.warn/2`.
