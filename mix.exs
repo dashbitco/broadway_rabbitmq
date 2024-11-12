@@ -54,7 +54,7 @@ defmodule BroadwayRabbitMQ.MixProject do
 
   defp package do
     %{
-      licenses: ["Apache 2.0"],
+      licenses: ["Apache-2.0"],
       links: %{
         "Changelog" => @source_url <> "/blob/master/CHANGELOG.md",
         "GitHub" => @source_url
