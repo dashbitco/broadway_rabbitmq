@@ -33,7 +33,7 @@ defmodule BroadwayRabbitMQ.MixProject do
   defp deps do
     [
       {:broadway, "~> 1.0"},
-      {:amqp, "~> 1.3 or ~> 2.0 or ~> 3.0"},
+      {:amqp, "~> 1.3 or ~> 2.0 or ~> 3.0 or ~> 4.0"},
       {:nimble_options, "~> 0.3.5 or ~> 0.4.0 or ~> 1.0"},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
 
