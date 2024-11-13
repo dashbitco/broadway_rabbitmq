@@ -16,9 +16,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Oldest-supported Elixir/OTP versions.
-          - elixir: "1.13.4"
-            otp: "25.3"
+          # Hard to test the oldest-supported version because rabbit_common and friends
+          # are a bit hard to get compatibility right for. However, we don't really need
+          # to do that here.
+          - elixir: "1.16"
+            otp: "26.3"
 
           # Latest-supported Elixir/OTP versions.
           - elixir: "1.17.3"
