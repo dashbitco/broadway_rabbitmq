@@ -20,16 +20,16 @@ jobs:
               elixir: "1.8.2"
               otp: "21.3.8.17"
           - pair:
-              elixir: "1.15.0"
-              otp: "25.3"
+              elixir: "1.17.3"
+              otp: "27.1"
             lint: lint
             coverage: coverage
     steps:
       - name: Clone the repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Start Docker
-        run: docker-compose up --detach
+        run: docker compose up --detach
 
       - name: Install Erlang/OTP and Elixir
         uses: erlef/setup-beam@v1
@@ -38,7 +38,7 @@ jobs:
           elixir-version: ${{ matrix.pair.elixir }}
 
       - name: Cache Mix dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             deps
@@ -58,9 +58,6 @@ jobs:
       - name: Check for unused dependencies
         run: mix deps.unlock --check-unused
         if: ${{ matrix.lint }}
-
-      - name: Compile Mix dependencies
-        run: mix deps.compile
 
       - name: Compile code and check for warnings
         run: mix compile --warnings-as-errors
