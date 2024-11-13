@@ -16,12 +16,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - pair:
-              elixir: "1.8.2"
-              otp: "21.3.8.17"
-          - pair:
-              elixir: "1.17.3"
-              otp: "27.1"
+          # Oldest-supported Elixir/OTP versions.
+          - elixir: "1.13.4"
+            otp: "22.3.4.27"
+
+          # Latest-supported Elixir/OTP versions.
+          - elixir: "1.17.3"
+            otp: "27.1"
             lint: lint
             coverage: coverage
     steps:
@@ -34,8 +35,8 @@ jobs:
       - name: Install Erlang/OTP and Elixir
         uses: erlef/setup-beam@v1
         with:
-          otp-version: ${{ matrix.pair.otp }}
-          elixir-version: ${{ matrix.pair.elixir }}
+          otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
 
       - name: Cache Mix dependencies
         uses: actions/cache@v4
@@ -44,9 +45,9 @@ jobs:
             deps
             _build
           key: |
-            ${{ runner.os }}-mix-${{ matrix.pair.elixir }}-${{ matrix.pair.otp }}-${{ hashFiles('**/mix.lock') }}
+            ${{ runner.os }}-mix-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-${{ matrix.pair.elixir }}-${{ matrix.pair.otp }}-
+            ${{ runner.os }}-mix-${{ matrix.elixir }}-${{ matrix.otp }}-
 
       - name: Fetch Mix dependencies
         run: mix deps.get
