@@ -9,7 +9,7 @@ defmodule BroadwayRabbitMQ.MixProject do
     [
       app: :broadway_rabbitmq,
       version: @version,
-      elixir: "~> 1.8",
+      elixir: "~> 1.13",
       name: "BroadwayRabbitMQ",
       description: @description,
       start_permanent: Mix.env() == :prod,

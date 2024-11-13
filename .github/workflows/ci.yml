@@ -16,37 +16,40 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - pair:
-              elixir: "1.8.2"
-              otp: "21.3.8.17"
-          - pair:
-              elixir: "1.15.0"
-              otp: "25.3"
+          # Hard to test the oldest-supported version because rabbit_common and friends
+          # are a bit hard to get compatibility right for. However, we don't really need
+          # to do that here.
+          - elixir: "1.16"
+            otp: "26.2"
+
+          # Latest-supported Elixir/OTP versions.
+          - elixir: "1.17.3"
+            otp: "27.1"
             lint: lint
             coverage: coverage
     steps:
       - name: Clone the repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Start Docker
-        run: docker-compose up --detach
+        run: docker compose up --detach
 
       - name: Install Erlang/OTP and Elixir
         uses: erlef/setup-beam@v1
         with:
-          otp-version: ${{ matrix.pair.otp }}
-          elixir-version: ${{ matrix.pair.elixir }}
+          otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
 
       - name: Cache Mix dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             deps
             _build
           key: |
-            ${{ runner.os }}-mix-${{ matrix.pair.elixir }}-${{ matrix.pair.otp }}-${{ hashFiles('**/mix.lock') }}
+            ${{ runner.os }}-mix-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-${{ matrix.pair.elixir }}-${{ matrix.pair.otp }}-
+            ${{ runner.os }}-mix-${{ matrix.elixir }}-${{ matrix.otp }}-
 
       - name: Fetch Mix dependencies
         run: mix deps.get
@@ -58,9 +61,6 @@ jobs:
       - name: Check for unused dependencies
         run: mix deps.unlock --check-unused
         if: ${{ matrix.lint }}
-
-      - name: Compile Mix dependencies
-        run: mix deps.compile
 
       - name: Compile code and check for warnings
         run: mix compile --warnings-as-errors
