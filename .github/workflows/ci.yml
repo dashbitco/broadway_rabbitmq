@@ -20,7 +20,7 @@ jobs:
           # are a bit hard to get compatibility right for. However, we don't really need
           # to do that here.
           - elixir: "1.16"
-            otp: "26.3"
+            otp: "26.2"
 
           # Latest-supported Elixir/OTP versions.
           - elixir: "1.17.3"
