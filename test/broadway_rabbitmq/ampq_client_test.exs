@@ -138,15 +138,15 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
 
     test ":queue is required" do
       assert AmqpClient.init([]) ==
-               {:error, "required option :queue not found, received options: []"}
+               {:error, "required :queue option not found, received options: []"}
 
       assert AmqpClient.init(queue: nil) ==
-               {:error, "expected :queue to be a string, got: nil"}
+               {:error, "invalid value for :queue option: expected string, got: nil"}
     end
 
     test ":queue should be a string" do
       assert AmqpClient.init(queue: :an_atom) ==
-               {:error, "expected :queue to be a string, got: :an_atom"}
+               {:error, "invalid value for :queue option: expected string, got: :an_atom"}
 
       {:ok, config} = AmqpClient.init(queue: "my_queue")
       assert config.queue == "my_queue"
@@ -165,9 +165,10 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
       {:ok, opts} = AmqpClient.init(queue: "queue", metadata: [:routing_key, :headers])
       assert opts[:metadata] == [:routing_key, :headers]
 
-      message =
-        ~s(list element at position 0 in :metadata failed validation: expected "list element" ) <>
-          ~s(to be an atom, got: "routing_key")
+      message = """
+      invalid list in :metadata option: invalid value for list element at position 0: expected \
+      atom, got: "routing_key"\
+      """
 
       assert AmqpClient.init(queue: "queue", metadata: ["routing_key", :headers]) ==
                {:error, message}
@@ -177,18 +178,20 @@ defmodule BroadwayRabbitMQ.AmqpClientTest do
       {:ok, opts} = AmqpClient.init(queue: "queue", bindings: [{"my-exchange", [arguments: []]}])
       assert opts[:bindings] == [{"my-exchange", [arguments: []]}]
 
-      message =
-        ~s(list element at position 0 in :bindings failed validation: expected binding to be ) <>
-          ~s(a {exchange, opts} tuple, got: :something)
+      message = """
+      invalid list in :bindings option: invalid value for list element at position 0: \
+      expected binding to be a {exchange, opts} tuple, got: :something\
+      """
 
       assert AmqpClient.init(queue: "queue", bindings: [:something, :else]) ==
                {:error, message}
     end
 
     test ":bindings with invalid binding options" do
-      message =
-        "list element at position 0 in :bindings failed validation: unknown options " <>
-          "[:invalid], valid options are: [:routing_key, :arguments]"
+      message = """
+      invalid list in :bindings option: invalid value for list element at position 0: \
+      unknown options [:invalid], valid options are: [:routing_key, :arguments]\
+      """
 
       assert AmqpClient.init(queue: "queue", bindings: [{"my-exchange", [invalid: true]}]) ==
                {:error, message}
